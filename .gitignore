@@ -1,0 +1,9 @@
+/target/
+node_modules/
+*.tsbuildinfo
+
+# Build outputs: tsc, wasm-pack and Vite.
+js/packages/*/dist/
+js/packages/host/wasm/
+js/packages/wallet-mock/wasm/
+apps/web/dist/

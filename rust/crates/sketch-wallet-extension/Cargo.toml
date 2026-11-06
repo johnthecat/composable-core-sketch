@@ -1,0 +1,27 @@
+[package]
+name = "sketch-wallet-extension"
+version = "0.1.0"
+description = "Interface crate of the Wallet extension point: the trait, its types and the generated web wrappers"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Compiles `WasmWallet`, which exports a Rust provider to JS. Only provider
+# crates enable it, so the core's WASM binary leaves the class out.
+export = []
+
+[dependencies]
+async-trait.workspace = true
+futures.workspace = true
+parity-scale-codec.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys.workspace = true
+send_wrapper = { workspace = true, features = ["futures"] }
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+
+[lints]
+workspace = true

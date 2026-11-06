@@ -1,0 +1,15 @@
+{
+  "name": "@sketch/wallet-mock",
+  "version": "0.0.0",
+  "private": true,
+  "description": "WASM build of the sketch-wallet-mock provider crate, written to wasm/ by `make wasm`",
+  "type": "module",
+  "main": "wasm/sketch_wallet_mock.js",
+  "types": "wasm/sketch_wallet_mock.d.ts",
+  "exports": {
+    ".": {
+      "types": "./wasm/sketch_wallet_mock.d.ts",
+      "import": "./wasm/sketch_wallet_mock.js"
+    }
+  }
+}
