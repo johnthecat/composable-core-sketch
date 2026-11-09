@@ -1,0 +1,14 @@
+{
+  "name": "@sketch/host-app-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The web host app: builds its WASM binary from host-app-web-wasm, implements storage and confirmation, picks providers, and frames the product",
+  "type": "module",
+  "dependencies": {
+    "@sketch/protocol-client": "*",
+    "@sketch/host": "*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.0"
+  }
+}

@@ -4,13 +4,8 @@
   "type": "module",
   "workspaces": [
     "js/packages/*",
-    "apps/web"
+    "apps/*"
   ],
-  "scripts": {
-    "build:wasm": "node scripts/build-wasm.mjs",
-    "format": "prettier --write \"js/packages/*/src/**/*.ts\" \"apps/web/src/**/*.ts\" \"scripts/**/*.mjs\" \"!**/generated/**\"",
-    "format:check": "prettier --check \"js/packages/*/src/**/*.ts\" \"apps/web/src/**/*.ts\" \"scripts/**/*.mjs\" \"!**/generated/**\""
-  },
   "devDependencies": {
     "@types/bun": "^1.3.0",
     "bun": "^1.3.0",

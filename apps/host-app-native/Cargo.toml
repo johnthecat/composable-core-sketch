@@ -1,0 +1,21 @@
+[package]
+name = "host-app-native"
+version = "0.1.0"
+description = "A native host's own crate: links the core and its providers into one library"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+host-provider-notifier-log.workspace = true
+host-provider-wallet-mock.workspace = true
+host-runtime.workspace = true
+parity-scale-codec.workspace = true
+protocol.workspace = true
+uniffi.workspace = true
+
+[lints]
+workspace = true

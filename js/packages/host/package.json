@@ -2,7 +2,7 @@
   "name": "@sketch/host",
   "version": "0.0.0",
   "private": true,
-  "description": "Loads the core's WASM binary and connects it to the host's wallet",
+  "description": "What every web host shares: the extension point interfaces and the product iframe connection",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,12 +12,7 @@
       "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsc -b",
-    "typecheck:test": "tsc -p tsconfig.test.json",
-    "test": "bun test"
-  },
   "dependencies": {
-    "scale-ts": "^1.6.1"
+    "@sketch/protocol-client": "*"
   }
 }

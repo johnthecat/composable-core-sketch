@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["rust/crates/*"]
+members = [
+	"rust/crates/*",
+	"apps/host-app-web/host-app-web-wasm",
+	"apps/host-app-native",
+]
 
 [workspace.package]
 edition = "2024"
@@ -13,18 +17,32 @@ async-trait = "0.1"
 clap = "4"
 futures = "0.3"
 futures-timer = "3"
+heck = "0.5"
 indoc = "2"
 js-sys = "0.3"
 parity-scale-codec = { version = "3", features = ["derive"] }
+proc-macro2 = "1"
+quote = "1"
 send_wrapper = "0.6"
 serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+serde_bytes = "0.11"
 serde_json = "1"
 sha2 = "0.10"
+syn = "2"
 thiserror = "2"
+uniffi = "0.32.0"
 wasm-bindgen = "0.2.118"
 wasm-bindgen-futures = "0.4"
+wasm-bindgen-test = "0.3"
+web-sys = "0.3"
 
-sketch-wallet-extension = { path = "rust/crates/sketch-wallet-extension" }
+host-extension = { path = "rust/crates/host-extension" }
+host-provider-notifier-log = { path = "rust/crates/host-provider-notifier-log" }
+host-provider-wallet-mock = { path = "rust/crates/host-provider-wallet-mock" }
+host-runtime = { path = "rust/crates/host-runtime" }
+protocol = { path = "rust/crates/protocol" }
+sketch-macros = { path = "rust/crates/sketch-macros" }
 
 [workspace.lints.rust]
 missing_docs = "warn"

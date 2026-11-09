@@ -1,77 +1,57 @@
-import { Vector } from "scale-ts";
+// Connecting a framed product to a host runtime. `Product` and `FrameSink`
+// are what a host's WASM binary takes: its `.d.ts` names them from here. The
+// runtime itself comes from that binary; `HostRuntime` and `ProductRuntime`
+// are the part of its classes this module calls.
 
-import initCore, {
-  HostRuntime as CoreHostRuntime,
-  type InitInput,
-} from "../wasm/sketch_core.js";
-import { mapSettled, subscriptionIterable } from "./adapter-support.js";
-import { Account, Signature, type Wallet } from "./generated/extensions.js";
-import {
-  decodeWalletError,
-  rawWallet,
-} from "./generated/extensions-adapter.js";
-
-/** What {@link createHostRuntime} builds the runtime from. */
-export interface HostRuntimeOptions {
-  /** The wallet the core signs with: a provider, or host code around one. */
-  wallet: Wallet;
-  /**
-   * The core's WASM binary. Defaults to the file beside the core's JS glue,
-   * which a bundler such as Vite serves.
-   */
-  coreWasm?: InitInput;
+/** The product a runtime serves. */
+export interface Product {
+  productId: string;
 }
 
-/**
- * The product-facing runtime. A declared failure rejects with a
- * `WalletErrorException`.
- */
+/** Where a product runtime sends the frames it produces, as natively. */
+export interface FrameSink {
+  /** One encoded frame for the product. */
+  emitFrame(frame: Uint8Array): void;
+}
+
+/** One product's connection to the core. */
+export interface ProductRuntime {
+  /** Serve one frame from the product. */
+  receiveFrame(frame: Uint8Array): Promise<void>;
+  /** Release the WASM object, which ends the connection. */
+  free(): void;
+}
+
+/** The runtime a host builds once and shares across products. */
 export interface HostRuntime {
-  /** The accounts a product may sign with. */
-  accounts(): Promise<Account[]>;
-  /**
-   * Signs `message` with the account `publicKey`. The core checks that the
-   * wallet holds the account, then asks it to sign the message wrapped in
-   * `<Bytes>…</Bytes>`.
-   */
-  signMessage(publicKey: Uint8Array, message: string): Promise<Signature>;
-  /** The account list, first as it is and then after each change. */
-  subscribeAccounts(): AsyncIterable<Account[]>;
+  /** A runtime serving `product`, which sends its frames to `sink`. */
+  productRuntime(product: Product, sink: FrameSink): ProductRuntime;
 }
 
 /**
- * Loads the core's WASM binary and builds a host runtime that signs with
- * `options.wallet`.
+ * Serve the product on the far end of `port`: its frames go to a new product
+ * runtime, and the runtime's frames go back. Returns a function that
+ * disconnects it.
  */
-export async function createHostRuntime(
-  options: HostRuntimeOptions,
-): Promise<HostRuntime> {
-  await initCore(
-    options.coreWasm === undefined
-      ? undefined
-      : { module_or_path: options.coreWasm },
-  );
-  const core = new CoreHostRuntime(rawWallet(options.wallet));
-  const accounts = Vector(Account);
-  return {
-    accounts: () =>
-      mapSettled(
-        () => core.accounts(),
-        (bytes) => accounts.dec(bytes),
-        decodeWalletError,
-      ),
-    signMessage: (publicKey, message) =>
-      mapSettled(
-        () => core.signMessage(publicKey, message),
-        (bytes) => Signature.dec(bytes),
-        decodeWalletError,
-      ),
-    subscribeAccounts: () =>
-      subscriptionIterable<Account[]>((onItem, onError) =>
-        core.subscribeAccounts(
-          (item) => onItem(accounts.dec(item)),
-          (reason) => onError(decodeWalletError(reason)),
-        ),
-      ),
+export function connectProductPort(
+  runtime: HostRuntime,
+  product: Product,
+  port: MessagePort,
+): () => void {
+  const productRuntime = runtime.productRuntime(product, {
+    emitFrame: (frame) => port.postMessage(frame),
+  });
+  port.onmessage = (event: MessageEvent) => {
+    if (event.data instanceof Uint8Array) {
+      productRuntime.receiveFrame(event.data).catch((error: unknown) => {
+        console.error("the core refused a product frame", error);
+      });
+    }
+  };
+  port.start();
+  return () => {
+    port.onmessage = null;
+    port.close();
+    productRuntime.free();
   };
 }

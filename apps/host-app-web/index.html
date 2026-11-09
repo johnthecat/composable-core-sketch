@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Composable Core sketch</title>
+  </head>
+  <body>
+    <header>
+      <h1>Composable Core sketch</h1>
+      <p>
+        One WASM binary holds the core and the providers this app links. The
+        page implements storage and confirmation itself, picks a wallet and a
+        notifier, and frames a product that talks to the core only through
+        protocol frames.
+      </p>
+      <p id="boot-status" class="muted">Loading the WASM binary…</p>
+    </header>
+    <main>
+      <section aria-labelledby="composition-title">
+        <h2 id="composition-title">Composition</h2>
+        <p class="muted">Changing it rebuilds the host runtime and reloads the product.</p>
+        <fieldset>
+          <legend>Wallet extension point</legend>
+          <label><input type="radio" name="wallet" value="tracked" checked /> Mock provider, wrapped by host code that tracks each request</label>
+          <label><input type="radio" name="wallet" value="provider" /> Mock provider as it is</label>
+          <label><input type="radio" name="wallet" value="typescript" /> Wallet written in TypeScript, no Rust provider</label>
+          <label><input type="radio" name="wallet" value="none" /> None</label>
+        </fieldset>
+        <fieldset>
+          <legend>Notifier extension point</legend>
+          <label><input type="radio" name="notifier" value="wrapped" checked /> Log provider, wrapped to show each notice here</label>
+          <label><input type="radio" name="notifier" value="none" /> None</label>
+        </fieldset>
+        <fieldset>
+          <legend>User confirmation extension point</legend>
+          <label><input type="radio" name="confirmation" value="ask" checked /> Ask here</label>
+          <label><input type="radio" name="confirmation" value="approve" /> Always approve</label>
+          <label><input type="radio" name="confirmation" value="deny" /> Always deny</label>
+        </fieldset>
+      </section>
+
+      <section aria-labelledby="wallet-title">
+        <h2 id="wallet-title">Wallet</h2>
+        <p class="muted">The mock provider stands in for a paired phone.</p>
+        <fieldset>
+          <legend>The phone answers sign requests with</legend>
+          <label><input type="radio" name="decision" value="Approve" checked /> Approve</label>
+          <label><input type="radio" name="decision" value="Decline" /> Decline</label>
+          <label><input type="radio" name="decision" value="Unreachable" /> Nothing</label>
+        </fieldset>
+        <label>
+          After (ms)
+          <input id="sign-delay" type="number" min="0" step="250" value="1000" />
+        </label>
+        <form id="add-account-form" class="row">
+          <input id="account-name" placeholder="Account name" required />
+          <button type="submit">Add account</button>
+        </form>
+        <div id="confirmation" class="confirmation" hidden>
+          <p id="confirmation-text"></p>
+          <div class="row">
+            <button type="button" id="confirm-approve">Approve</button>
+            <button type="button" id="confirm-deny" class="secondary">Deny</button>
+          </div>
+        </div>
+        <p id="notice" class="notice" aria-live="polite"></p>
+      </section>
+
+      <section aria-labelledby="product-title" class="wide">
+        <h2 id="product-title">Product, in an iframe</h2>
+        <div id="product-frame" class="product-frame"></div>
+      </section>
+
+      <section aria-labelledby="requests-title" class="wide">
+        <h2 id="requests-title">Between the core and the wallet</h2>
+        <p class="muted">
+          Requests the core sent and changes the wallet pushed, recorded by host
+          code around the provider with the tracking wallet selected. The core
+          reports no request status to the host.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Method</th>
+              <th>Request</th>
+              <th>Status</th>
+              <th>Outcome</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="requests"></tbody>
+        </table>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -2,8 +2,19 @@
 node_modules/
 *.tsbuildinfo
 
+# Written by `make codegen`, never committed.
+js/packages/protocol-client/src/generated/
+js/packages/host/src/generated/
+
 # Build outputs: tsc, wasm-pack and Vite.
 js/packages/*/dist/
-js/packages/host/wasm/
-js/packages/wallet-mock/wasm/
-apps/web/dist/
+apps/host-app-web/wasm/
+apps/*/dist/
+
+# Native bindings and builds, written by `make swift` and `make kotlin`.
+apps/host-app-swift/.build/
+apps/host-app-swift/Sources/HostAppNative/
+apps/host-app-swift/Sources/HostAppNativeFFI/
+apps/host-app-kotlin/build/
+apps/host-app-kotlin/.gradle/
+apps/host-app-kotlin/.kotlin/

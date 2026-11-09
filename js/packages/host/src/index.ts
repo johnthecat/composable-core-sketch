@@ -1,22 +1,17 @@
-// The host package: `createHostRuntime` loads the core and connects it to the
-// host's wallet. The `Wallet` interface and its adapters are generated from the
-// interface crate by sketch-codegen.
+// What every web host shares: the extension point interfaces its WASM binary
+// takes, generated from the interface crate by tool-codegen, and the code that
+// frames a product and connects it to the runtime.
 
 export {
-  createHostRuntime,
+  connectProductPort,
+  type FrameSink,
   type HostRuntime,
-  type HostRuntimeOptions,
+  type Product,
+  type ProductRuntime,
 } from "./runtime.js";
 export {
-  Account,
-  SignRequest,
-  Signature,
-  WalletError,
-  WalletErrorException,
-  type Wallet,
-} from "./generated/extensions.js";
-export {
-  rawWallet,
-  typedWallet,
-  type RawWallet,
-} from "./generated/extensions-adapter.js";
+  createIframeHost,
+  type IframeHost,
+  type IframeHostOptions,
+} from "./iframe-host.js";
+export * from "./generated/extensions.js";

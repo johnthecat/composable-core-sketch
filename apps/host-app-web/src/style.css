@@ -1,0 +1,206 @@
+:root {
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --text: #1d1d1b;
+  --muted: #6b6b66;
+  --border: #deded8;
+  --accent: #3b5bdb;
+  --ok: #2b8a3e;
+  --warn: #b35c00;
+  --error: #c92a2a;
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.45;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615;
+    --panel: #1f1f1d;
+    --text: #ececea;
+    --muted: #a3a39c;
+    --border: #34342f;
+    --accent: #7d95ff;
+    --ok: #69db7c;
+    --warn: #ffa94d;
+    --error: #ff8787;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header,
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header h1 {
+  margin: 24px 0 4px;
+  font-size: 1.5rem;
+}
+
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  padding-bottom: 32px;
+}
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+
+section.wide {
+  grid-column: 1 / -1;
+  overflow-x: auto;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+h3 {
+  margin: 16px 0 6px;
+  font-size: 0.95rem;
+}
+
+.muted {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+label {
+  display: block;
+  margin: 8px 0;
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+input:not([type="radio"]),
+select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.row input {
+  flex: 1;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+td:nth-child(3),
+td:nth-child(5) {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.status-pending {
+  color: var(--warn);
+}
+
+.status-answered {
+  color: var(--ok);
+}
+
+.status-rejected,
+.status-failed {
+  color: var(--error);
+}
+
+.status-pushed {
+  color: var(--muted);
+}
+
+fieldset label {
+  display: block;
+}
+
+.product-frame iframe {
+  width: 100%;
+  height: 520px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.confirmation {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+}
+
+.notice {
+  color: var(--ok);
+  min-height: 1.5em;
+}

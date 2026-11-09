@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sketch product</title>
+  </head>
+  <body class="product">
+    <p id="connection" class="muted">Connecting to the host…</p>
+    <h3>Accounts, live</h3>
+    <ul id="accounts" class="accounts"></ul>
+    <button type="button" id="follow-accounts" class="secondary">Stop following accounts</button>
+    <form id="sign-form">
+      <label>
+        Account
+        <select id="sign-account"></select>
+      </label>
+      <label>
+        Message
+        <input id="sign-message" value="Hello from the product" />
+      </label>
+      <div class="row">
+        <button type="submit" id="sign">Sign</button>
+        <button type="button" id="sign-unknown" class="secondary">Sign with an unknown account</button>
+      </div>
+    </form>
+    <div class="row">
+      <input id="note" value="a note" />
+      <button type="button" id="save-note">Save note</button>
+      <button type="button" id="load-note" class="secondary">Load note</button>
+      <button type="button" id="notify" class="secondary">Notify</button>
+    </div>
+    <h3>Results</h3>
+    <ol id="results" class="results"></ol>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
