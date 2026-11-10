@@ -7,8 +7,8 @@
 #   1. cargo +<pinned nightly> doc -p protocol -p host-extension --no-deps
 #      -> target/doc/{protocol,host_extension}.json
 #   2. cargo run -p tool-codegen
-#      -> the product client (@sketch/protocol-client) and the extension
-#         point interfaces (@sketch/host-extension)
+#      -> the extension point interfaces (@sketch/host-extension), with the
+#         protocol types they name
 #   3. prettier on the generated TypeScript
 
 set -euo pipefail
@@ -26,10 +26,7 @@ RUSTDOCFLAGS="${RUSTDOCFLAGS:-} -D warnings -Z unstable-options --output-format 
 cargo run -p tool-codegen -- \
   --protocol-input target/doc/protocol.json \
   --extension-input target/doc/host_extension.json \
-  --client-output js/packages/protocol-client/src/generated \
-  --extension-output js/packages/host-extension/src/generated
+  --output js/packages/host-extension/src/generated
 
 # --no: use the installed prettier, never resolve or fetch one.
-npm exec --no -- prettier --write \
-  "js/packages/protocol-client/src/generated/**/*.ts" \
-  "js/packages/host-extension/src/generated/**/*.ts"
+npm exec --no -- prettier --write "js/packages/host-extension/src/generated/**/*.ts"

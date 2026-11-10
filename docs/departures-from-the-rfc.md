@@ -53,19 +53,20 @@
 
 Followed:
 
-- the protocol traits with wire-id doc tags;
+- the protocol traits with wire ids;
 - the frame layout and leg bytes;
 - a `Dispatcher` over per-method tables;
 - `ProductRuntimeHost` serving each service;
 - `productRuntime(product, { emitFrame })` and `receiveFrame`;
-- the generated TS client over `TrUApiTransport` with neverthrow;
-- the iframe `truapi-ready`/`truapi-init` handshake;
 - rustdoc JSON on the pinned nightly;
 - the trait ids, listed in [`api.rs`](../rust/crates/protocol/src/api.rs);
 - generated files ignored by git.
 
 Left out, since none changes how an extension point attaches:
 
+- a real product: the RFC leaves the protocol as it is, so the hosts drive the core with
+  [product-stand-in](../apps/product-stand-in/README.md), and truapi's TS product client and iframe handshake are left
+  out;
 - protocol versioning: truapi carries each payload in a versioned envelope and serves it through
   `version(request).exec(...)`. Here each method names its request, response and error types directly, so a frame's
   payload is that type's SCALE encoding, and a method without a request sends an empty payload;
@@ -79,6 +80,6 @@ Left out, since none changes how an extension point attaches:
 - request timeouts;
 - the wire schema hash;
 - the debug tap;
-- running the core in a Web Worker, and reconnecting an iframe that navigates.
+- running the core in a Web Worker.
 
 The mock and TypeScript wallets' keys and signatures are SHA-2 hashes standing in for real ones.

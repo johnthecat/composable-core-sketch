@@ -83,7 +83,7 @@ fn assert_snapshot(file: &str, actual: &str) {
 	assert_eq!(actual, expected, "{file} differs from its snapshot");
 }
 
-/// A protocol type the listener names, which the file imports.
+/// A protocol type the listener names, which the file declares too.
 fn time() -> TypeDef {
 	TypeDef {
 		name: name("protocol::api::Time"),
@@ -97,8 +97,8 @@ fn time() -> TypeDef {
 }
 
 #[test]
-fn extension_points_emit_typed_interfaces_and_import_protocol_types() {
+fn extension_points_emit_typed_interfaces_and_the_protocol_types_they_name() {
 	let types = [notifier_error(), time()];
 
-	assert_snapshot("extensions.ts.snap", &extensions("host_extension", &traits(), &types));
+	assert_snapshot("extensions.ts.snap", &extensions(&traits(), &types));
 }

@@ -1,32 +1,38 @@
 // The demo's compositions end to end: the app's real WASM binary, holding the
-// core and both providers, and the product's generated client on the far end
-// of a MessageChannel. Needs `make wasm` and the package builds.
+// core and both providers, driven by the stand-in product's frames. Needs
+// `make wasm` and the package builds.
 
 import { beforeAll, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-import {
-  createClient,
-  createMessagePortProvider,
-  createTransport,
-  decodeWireMessage,
-  MESSAGE_TYPE_RESPONSE,
-  wire,
-  type ProtocolMessage,
-  type TrUApiClient,
-} from "@sketch/protocol-client";
-import { connectProductPort } from "@sketch/host";
-import type { Notifier, Wallet } from "@sketch/host-extension";
+import type { Wallet } from "@sketch/host-extension";
 
 import init, {
+  FrameLeg,
+  getAccountsFrame,
   hostRuntime,
   logNotifier,
   MockPhone,
   PhoneDecision,
+  pushNotificationFrame,
+  signRawFrame,
+  storageReadFrame,
+  storageWriteFrame,
 } from "../wasm/host_app_web_wasm.js";
-import { memoryStorage, pageConfirmation } from "./host-extensions.js";
+import {
+  memoryStorage,
+  pageConfirmation,
+  showingNotifier,
+} from "./host-extensions.js";
+import { StandInProduct, type Frame } from "./stand-in-product.js";
 import { trackRequests, type WalletRequest } from "./tracking-wallet.js";
 import { TypeScriptWallet } from "./ts-wallet.js";
+
+/** A confirmation the user always approves. */
+const approveAll = pageConfirmation(
+  () => "approve",
+  async () => true,
+);
 
 beforeAll(async () => {
   await init({
@@ -37,11 +43,11 @@ beforeAll(async () => {
 });
 
 interface Composition {
-  client: TrUApiClient;
-  /** Every frame the core sent to `client`, as the product's port received it. */
-  frames: ProtocolMessage[];
-  /** A client of another product served by the same runtime. */
-  connect(productId: string): TrUApiClient;
+  product: StandInProduct;
+  /** Every frame the core sent to `product`, in order. */
+  frames: Frame[];
+  /** Another product served by the same runtime. */
+  connect(productId: string): StandInProduct;
   phone: MockPhone;
   typeScriptWallet: TypeScriptWallet;
   alice: Uint8Array;
@@ -70,35 +76,22 @@ async function compose(options: {
     none: undefined,
   };
   const notices: string[] = [];
-  const inner = logNotifier();
-  const notifier: Notifier = {
-    async notify(text) {
-      notices.push(text);
-      await inner.notify(text);
-    },
-  };
   const runtime = hostRuntime(
     memoryStorage(),
-    pageConfirmation(
-      () => "approve",
-      async () => true,
-    ),
+    approveAll,
     wallets[options.wallet],
-    options.notifier ? notifier : undefined,
+    options.notifier
+      ? showingNotifier(logNotifier(), (text) => notices.push(text))
+      : undefined,
   );
-  const connect = (productId: string, frames: ProtocolMessage[] = []) => {
-    const channel = new MessageChannel();
-    connectProductPort(runtime, { productId }, channel.port1);
-    const provider = createMessagePortProvider(channel.port2);
-    provider.subscribe((frame) => frames.push(decodeWireMessage(frame)));
-    return createClient(createTransport(provider));
-  };
   const [alice] = await phone.wallet().accounts();
-  const frames: ProtocolMessage[] = [];
+  const frames: Frame[] = [];
   return {
-    client: connect("test-product", frames),
+    product: new StandInProduct(runtime, "test-product", (frame) =>
+      frames.push(frame),
+    ),
     frames,
-    connect,
+    connect: (productId) => new StandInProduct(runtime, productId),
     phone,
     typeScriptWallet,
     alice: alice?.publicKey ?? new Uint8Array(32),
@@ -113,19 +106,26 @@ async function compose(options: {
   };
 }
 
-const sign = (composition: Composition, publicKey = composition.alice) =>
-  composition.client.signing.signRaw({
-    publicKey,
-    payload: new TextEncoder().encode("hi"),
-  });
+const message = new TextEncoder().encode("hi");
 
-describe("a product talking to the core through frames", () => {
+const sign = async (composition: Composition, publicKey = composition.alice) =>
+  (
+    await composition.product.call((requestId) =>
+      signRawFrame(requestId, publicKey, message),
+    )
+  ).outcome;
+
+/** The account names in a frame the stand-in read back as text. */
+const names = (frame: Frame) =>
+  [...frame.outcome.matchAll(/name: "([^"]*)"/g)].map((match) => match[1]);
+
+describe("the stand-in product talking to the core through frames", () => {
   test("a confirmed signature: the wrapper sees the account check and the product's message", async () => {
     const composition = await compose({ wallet: "tracked" });
 
-    const result = await sign(composition);
+    const outcome = await sign(composition);
 
-    expect(result.isOk() && result.value.signature.length).toBe(64);
+    expect(outcome).toStartWith("Ok(HostSignRawResponse");
     expect(composition.requests()).toEqual([
       {
         method: "accounts",
@@ -147,87 +147,76 @@ describe("a product talking to the core through frames", () => {
     const composition = await compose({ wallet: "tracked" });
     composition.phone.setDecision(PhoneDecision.Decline);
 
-    const result = await sign(composition);
+    const outcome = await sign(composition);
 
-    expect(result.isErr() && result.error).toEqual({
-      tag: "Domain",
-      value: { tag: "Rejected", value: undefined },
-    });
+    expect(outcome).toBe("Err(Domain(Rejected))");
     expect(composition.requests().at(-1)?.status).toBe("rejected");
   });
 
   test("a wallet written in TypeScript serves the core like a provider", async () => {
     const composition = await compose({ wallet: "typescript" });
 
-    const accounts = await composition.client.account.getAccounts();
-    const carol = accounts.isOk() ? accounts.value.accounts[0] : undefined;
-    const signed = carol && (await sign(composition, carol.publicKey));
+    const accounts = await composition.product.call(getAccountsFrame);
+    const [carol] = await composition.typeScriptWallet.accounts();
+    const signed = await sign(composition, carol?.publicKey);
 
-    expect({ name: carol?.name, signed: signed?.isOk() }).toEqual({
-      name: "carol",
-      signed: true,
+    expect({ names: names(accounts), signed }).toEqual({
+      names: ["carol"],
+      signed: expect.stringMatching(/^Ok\(HostSignRawResponse/),
     });
   });
 
   test("a notice passes through the host's wrapper to the log provider", async () => {
     const composition = await compose({ wallet: "none", notifier: true });
 
-    const shown = await composition.client.notifications.pushNotification({
-      text: "saved",
-    });
-    const empty = await composition.client.notifications.pushNotification({
-      text: " ",
-    });
+    const shown = await composition.product.call((requestId) =>
+      pushNotificationFrame(requestId, "saved"),
+    );
+    const empty = await composition.product.call((requestId) =>
+      pushNotificationFrame(requestId, " "),
+    );
 
     expect({
-      shown: shown.isOk(),
-      empty: empty.isErr() && empty.error.tag,
+      shown: shown.outcome,
+      empty: empty.outcome,
       notices: composition.notices,
     }).toEqual({
-      shown: true,
-      empty: "Domain",
+      shown: "Ok(())",
+      empty: expect.stringMatching(/^Err\(Domain\(/),
       notices: ["saved", " "],
     });
   });
 
-  /** Follow the product's account subscription, keeping each list's names. */
+  /**
+   * Follow the product's account subscription: each list's names, a promise
+   * for the next item, and the stop.
+   */
   const follow = (composition: Composition) => {
     const lists: string[][] = [];
-    composition.client.account.accountsSubscribe().subscribe({
-      next: (item) => lists.push(item.accounts.map((account) => account.name)),
+    let arrived = () => {};
+    const stop = composition.product.followAccounts((item) => {
+      lists.push(names(item));
+      arrived();
     });
-    return lists;
+    const next = () => new Promise<void>((resolve) => (arrived = resolve));
+    return { lists, next, stop };
   };
 
-  // No timing: the host serves the product's frames in order, so the answer to
-  // a call made after unsubscribing proves the stop was served; and an item the
-  // core sent for the next push would reach the product before the answer to a
-  // call made after that push. The frames are counted at the port, because the
-  // client ignores those of a subscription it ended.
+  // No timing: the core serves the product's frames in order, so the answer to
+  // a call made after the stop proves the stop was served; and an item the core
+  // sent for the next push would reach the product before the answer to a call
+  // made after that push.
   test("a stopped subscription receives nothing more", async () => {
     const composition = await compose({ wallet: "tracked" });
-    const lists: string[][] = [];
-    let firstItem = () => {};
-    const first = new Promise<void>((resolve) => (firstItem = resolve));
-    const subscription = composition.client.account
-      .accountsSubscribe()
-      .subscribe({
-        next: (item) => {
-          lists.push(item.accounts.map((account) => account.name));
-          firstItem();
-        },
-      });
-    await first;
+    const { lists, next, stop } = follow(composition);
+    await next();
 
-    subscription.unsubscribe();
-    await composition.client.account.getAccounts();
+    stop();
+    await composition.product.call(getAccountsFrame);
     composition.phone.addAccount("bob");
-    await composition.client.account.getAccounts();
+    await composition.product.call(getAccountsFrame);
     const items = composition.frames.filter(
-      (frame) =>
-        frame.traitId === wire.ACCOUNT_ACCOUNTS_SUBSCRIBE.trait &&
-        frame.methodId === wire.ACCOUNT_ACCOUNTS_SUBSCRIBE.method &&
-        frame.messageType === MESSAGE_TYPE_RESPONSE,
+      (frame) => frame.leg === FrameLeg.Item,
     );
 
     expect({ lists, items: items.length }).toEqual({
@@ -241,12 +230,13 @@ describe("a product talking to the core through frames", () => {
   test("an account added on the phone reaches the product's subscription through the tracking wallet", async () => {
     const composition = await compose({ wallet: "tracked" });
     const followed = follow(composition);
-    await Bun.sleep(20);
+    await followed.next();
 
+    const pushed = followed.next();
     composition.phone.addAccount("bob");
-    await Bun.sleep(20);
+    await pushed;
 
-    expect(followed).toEqual([["alice"], ["alice", "bob"]]);
+    expect(followed.lists).toEqual([["alice"], ["alice", "bob"]]);
     expect(
       composition
         .requests()
@@ -264,12 +254,13 @@ describe("a product talking to the core through frames", () => {
   test("an account added to a wallet written in TypeScript reaches the product's subscription", async () => {
     const composition = await compose({ wallet: "typescript" });
     const followed = follow(composition);
-    await Bun.sleep(20);
+    await followed.next();
 
+    const pushed = followed.next();
     await composition.typeScriptWallet.addAccount("erin");
-    await Bun.sleep(20);
+    await pushed;
 
-    expect(followed).toEqual([["carol"], ["carol", "erin"]]);
+    expect(followed.lists).toEqual([["carol"], ["carol", "erin"]]);
   });
 
   test("an extension point object missing a method is refused when the runtime is built", () => {
@@ -278,34 +269,34 @@ describe("a product talking to the core through frames", () => {
       sign: async () => ({ bytes: new Uint8Array(64) }),
     } as unknown as Wallet;
 
-    expect(() =>
-      hostRuntime(
-        memoryStorage(),
-        pageConfirmation(
-          () => "approve",
-          async () => true,
-        ),
-        incomplete,
-      ),
-    ).toThrow("the Wallet object has no method setAccountsListener");
+    expect(() => hostRuntime(memoryStorage(), approveAll, incomplete)).toThrow(
+      "the Wallet object has no method setAccountsListener",
+    );
   });
 
   test("storage goes through the host's ProductStorage, scoped to the product", async () => {
     const composition = await compose({ wallet: "none" });
     const other = composition.connect("other-product");
-    const value = new TextEncoder().encode("a note");
 
-    const written = await composition.client.localStorage.write({
-      key: "note",
-      value,
-    });
-    const own = await composition.client.localStorage.read({ key: "note" });
-    const others = await other.localStorage.read({ key: "note" });
+    const written = await composition.product.call((requestId) =>
+      storageWriteFrame(requestId, "note", new TextEncoder().encode("a note")),
+    );
+    const own = await composition.product.call((requestId) =>
+      storageReadFrame(requestId, "note"),
+    );
+    const others = await other.call((requestId) =>
+      storageReadFrame(requestId, "note"),
+    );
 
     expect({
-      written: written.isOk(),
-      own: own.isOk() && own.value.value,
-      others: others.isOk() && others.value.value,
-    }).toEqual({ written: true, own: value, others: undefined });
+      written: written.outcome,
+      own: own.outcome,
+      others: others.outcome,
+    }).toEqual({
+      written: "Ok(())",
+      // "a note", as bytes.
+      own: "Ok(HostLocalStorageReadResponse { value: Some(Bytes([97, 32, 110, 111, 116, 101])) })",
+      others: "Ok(HostLocalStorageReadResponse { value: None })",
+    });
   });
 });

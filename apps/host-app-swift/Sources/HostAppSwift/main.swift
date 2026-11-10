@@ -3,9 +3,9 @@
 // and confirmation. It wraps the wallet provider in Swift to see every request
 // the core sends to it, and plays a product by sending protocol frames.
 //
-// A native app has no TypeScript client, so the product's frames come from the
-// stand-in product's frame builders (`signRawFrame`, `describeFrame`, ...): built
-// from the protocol crate's types, they are the bytes a product's client sends.
+// The product's frames come from the stand-in product (`signRawFrame`,
+// `describeFrame`, ...), the same one the web host app drives the core with.
+// Built from the protocol crate's types, they are the bytes a product sends.
 
 import Foundation
 import HostAppNative

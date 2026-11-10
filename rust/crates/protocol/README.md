@@ -17,11 +17,10 @@ without depending on the core.
 
 ## Tests
 
-[`src/frame/tests.rs`](src/frame/tests.rs) checks the frame layout against the bytes the TypeScript client's test checks
-too.
+[`src/frame/tests.rs`](src/frame/tests.rs) checks the frame layout byte by byte.
 
 ## Next
 
 - [host-macros](../host-macros/README.md), for what `#[wire_trait]` writes.
 - [host-runtime](../host-runtime/README.md), which serves the protocol.
-- [@sketch/protocol-client](../../../js/packages/protocol-client/README.md), the client generated from it.
+- [product-stand-in](../../../apps/product-stand-in/README.md), which builds a product's frames from it.

@@ -28,50 +28,37 @@ pub fn method_table(item_trait: &ItemTrait, trait_id: u8) -> syn::Result<TokenSt
 		});
 		let Request { decoded, binding, arguments } = request(method)?;
 		let (shape, value, error) = output_types(method)?;
-		entries.push(match shape.as_str() {
-			"Result" => quote! {
-				crate::dispatch::Method {
-					ids: #constant,
-					handler: crate::dispatch::Handler::Request(
-						|host: ::std::sync::Arc<H>, bytes: ::std::vec::Vec<u8>|
-						 -> ::futures::future::BoxFuture<'static, ::std::vec::Vec<u8>> {
-							::std::boxed::Box::pin(async move {
-								match <#decoded as ::parity_scale_codec::DecodeAll>::decode_all(&mut &bytes[..]) {
-									Ok(#binding) => ::parity_scale_codec::Encode::encode(&host.#name(#arguments).await),
-									Err(error) => {
-										let malformed: ::core::result::Result<#value, crate::CallError<#error>> =
-											Err(crate::CallError::MalformedFrame { reason: error.to_string() });
-										::parity_scale_codec::Encode::encode(&malformed)
-									},
-								}
-							})
-						},
-					),
-				}
-			},
-			_ => quote! {
-				crate::dispatch::Method {
-					ids: #constant,
-					handler: crate::dispatch::Handler::Subscription(
-						|host: ::std::sync::Arc<H>, bytes: ::std::vec::Vec<u8>|
-						 -> ::futures::future::BoxFuture<
-							'static,
-							::core::result::Result<crate::dispatch::SubscriptionStream, ::std::vec::Vec<u8>>,
-						> {
-							::std::boxed::Box::pin(async move {
-								match <#decoded as ::parity_scale_codec::DecodeAll>::decode_all(&mut &bytes[..]) {
-									Ok(#binding) => Ok(crate::dispatch::subscription_stream(host.#name(#arguments).await)),
-									Err(error) => {
-										let malformed: crate::CallError<#error> =
-											crate::CallError::MalformedFrame { reason: error.to_string() };
-										Err(crate::dispatch::subscription_interrupt(malformed))
-									},
-								}
-							})
-						},
-					),
-				}
-			},
+		let malformed =
+			quote!(crate::CallError::<#error>::MalformedFrame { reason: error.to_string() });
+		let (handler, output, served, refused) = match shape.as_str() {
+			"Result" => (
+				quote!(Request),
+				quote!(::std::vec::Vec<u8>),
+				quote!(::parity_scale_codec::Encode::encode(&host.#name(#arguments).await)),
+				quote!(::parity_scale_codec::Encode::encode(&::core::result::Result::<#value, _>::Err(#malformed))),
+			),
+			_ => (
+				quote!(Subscription),
+				quote!(crate::dispatch::SubscriptionStream),
+				quote!(crate::dispatch::subscription_stream(host.#name(#arguments).await)),
+				quote!(crate::dispatch::subscription_stream(crate::Subscription::<#value, _>::interrupted(#malformed))),
+			),
+		};
+		entries.push(quote! {
+			crate::dispatch::Method {
+				ids: #constant,
+				handler: crate::dispatch::Handler::#handler(
+					|host: ::std::sync::Arc<H>, bytes: ::std::vec::Vec<u8>|
+					 -> ::futures::future::BoxFuture<'static, #output> {
+						::std::boxed::Box::pin(async move {
+							match <#decoded as ::parity_scale_codec::DecodeAll>::decode_all(&mut &bytes[..]) {
+								Ok(#binding) => #served,
+								Err(error) => #refused,
+							}
+						})
+					},
+				),
+			}
 		});
 	}
 	let doc =

@@ -1,7 +1,9 @@
 // The extension points this host implements itself: storage in memory, and a
-// confirmation the user answers on this page.
+// confirmation the user answers on this page. Also the host code around the
+// log provider.
 
 import type {
+  Notifier,
   ProductStorage,
   UserConfirmation,
   UserConfirmationReview,
@@ -20,6 +22,22 @@ export function memoryStorage(): ProductStorage {
     read: async (key) => values.get(key),
     write: async (key, value) => {
       values.set(key, value);
+    },
+  };
+}
+
+/**
+ * Host code around a notifier provider, as in the RFC's example: it shows each
+ * notice with `show`, then lets `inner` log it.
+ */
+export function showingNotifier(
+  inner: Notifier,
+  show: (text: string) => void,
+): Notifier {
+  return {
+    async notify(text) {
+      show(text);
+      await inner.notify(text);
     },
   };
 }

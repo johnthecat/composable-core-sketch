@@ -13,7 +13,7 @@ use serde_json::Value;
 use crate::{
 	model::{TypeDefKind, TypeName, TypeRef, VariantShape},
 	rustdoc::{
-		Crate, Item, World, async_trait_output, clean_docs, params, path_leaf, tag_value, type_args,
+		Crate, Item, World, async_trait_output, clean_docs, has_tag, params, path_leaf, type_args,
 	},
 };
 
@@ -81,7 +81,7 @@ impl ExtensionMethod {
 pub fn root_types(krate: &Crate) -> Result<Vec<TypeRef>> {
 	let mut types = Vec::new();
 	for (id, item) in krate.root_items()? {
-		if tag_value(item.docs.as_deref(), "extension_type") == Some(1) &&
+		if has_tag(item.docs.as_deref(), "extension_type") &&
 			let Some(path) = krate.local_path(&id)
 		{
 			types.push(TypeRef::Named(TypeName::new(path.path.clone())));

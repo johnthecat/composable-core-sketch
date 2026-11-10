@@ -74,11 +74,6 @@ h2 {
   font-size: 1.1rem;
 }
 
-h3 {
-  margin: 16px 0 6px;
-  font-size: 0.95rem;
-}
-
 .muted {
   color: var(--muted);
   margin-top: 4px;
@@ -95,8 +90,7 @@ fieldset {
   margin: 8px 0;
 }
 
-input:not([type="radio"]),
-select {
+input:not([type="radio"]) {
   display: block;
   width: 100%;
   box-sizing: border-box;
@@ -150,8 +144,9 @@ td {
   vertical-align: top;
 }
 
-td:nth-child(3),
-td:nth-child(5) {
+#requests td:nth-child(3),
+#requests td:nth-child(5),
+#frames td:nth-child(4) {
   font-family: ui-monospace, monospace;
   overflow-wrap: anywhere;
 }
@@ -182,16 +177,8 @@ td:nth-child(5) {
   color: var(--muted);
 }
 
-fieldset label {
-  display: block;
-}
-
-.product-frame iframe {
-  width: 100%;
-  height: 520px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
+#frames td:nth-child(3) {
+  white-space: nowrap;
 }
 
 .confirmation {

@@ -21,12 +21,12 @@ fn async_trait_methods_are_read_through_their_boxed_future() {
 }
 
 #[test]
-fn wire_tags_are_read_from_docs_and_kept_out_of_them() {
-	let docs = " Sign raw bytes.\n@wire_id=7";
+fn codegen_tags_are_read_from_docs_and_kept_out_of_them() {
+	let docs = " An account.\n@extension_type";
 
 	assert_eq!(
-		(tag_value(Some(docs), "wire_id"), clean_docs(Some(docs))),
-		(Some(7), Some("Sign raw bytes.".to_string())),
+		(has_tag(Some(docs), "extension_type"), clean_docs(Some(docs))),
+		(true, Some("An account.".to_string())),
 	);
 }
 
@@ -58,10 +58,7 @@ fn a_newtype_resolves_to_its_field_and_a_record_stays_named() {
 
 	assert_eq!(
 		(world.type_ref(&krate, &named(1)).unwrap(), world.type_ref(&krate, &named(3)).unwrap()),
-		(
-			TypeRef::FixedBytes(32),
-			TypeRef::Named(TypeName::new(vec!["protocol".into(), "Account".into()]))
-		),
+		(TypeRef::Bytes, TypeRef::Named(TypeName::new(vec!["protocol".into(), "Account".into()]))),
 	);
 }
 

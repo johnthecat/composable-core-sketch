@@ -10,11 +10,8 @@ export NIGHTLY_TOOLCHAIN
 # A bun on PATH, otherwise the one the root devDependencies install.
 BUN ?= $(shell command -v bun 2>/dev/null || echo $(CURDIR)/node_modules/.bin/bun)
 BIN := $(CURDIR)/node_modules/.bin
-CLIENT_PKG := js/packages/protocol-client
 EXTENSION_PKG := js/packages/host-extension
-HOST_PKG := js/packages/host
 HOST_APP := apps/host-app-web
-PRODUCT_APP := apps/product
 PRETTIER_FILES := "js/packages/*/src/**/*.ts" "apps/*/src/**/*.ts" "apps/*/*.ts" "scripts/**/*.mjs" "!**/generated/**"
 
 help: ## Show this help.
@@ -26,34 +23,23 @@ setup: ## Install the JS dependencies. Add the pinned nightly and the wasm32 tar
 	rustup toolchain install "$(NIGHTLY_TOOLCHAIN)" --component rustfmt
 	rustup target add wasm32-unknown-unknown
 
-codegen: ## Generate the product client and the extension point interfaces (TypeScript only).
+codegen: ## Generate the extension point interfaces (TypeScript only).
 	./scripts/codegen.sh
 
 wasm: ## Build the web host app's WASM binary: the core and the providers it links.
 	node scripts/build-wasm.mjs
 
-packages: codegen ## Build the TypeScript packages under js/packages.
-	cd $(CLIENT_PKG) && $(BIN)/tsc -b
+packages: codegen ## Build the TypeScript package of the interface crate.
 	cd $(EXTENSION_PKG) && $(BIN)/tsc -b
-	cd $(HOST_PKG) && $(BIN)/tsc -b
 
-build: packages wasm ## Build everything, including both web apps for production.
-	cd $(PRODUCT_APP) && $(BIN)/tsc -p tsconfig.json && $(BIN)/vite build
+build: packages wasm ## Build everything, including the web host app for production.
 	cd $(HOST_APP) && $(BIN)/tsc -p tsconfig.json && $(BIN)/vite build
 
-# The host app frames the product from the product app's own origin, so both
-# servers run: the host on http://localhost:5181, the product on :5182.
-dev: packages wasm ## Serve the web host app (:5181) and the product (:5182) with Vite.
-	trap 'kill 0' EXIT; \
-	(cd $(PRODUCT_APP) && $(BIN)/vite) & \
-	(cd $(HOST_APP) && $(BIN)/vite) & \
-	wait
+dev: packages wasm ## Serve the web host app on http://localhost:5181 with Vite.
+	cd $(HOST_APP) && $(BIN)/vite
 
-preview: build ## Serve the production builds of both apps on the same ports.
-	trap 'kill 0' EXIT; \
-	(cd $(PRODUCT_APP) && $(BIN)/vite preview) & \
-	(cd $(HOST_APP) && $(BIN)/vite preview) & \
-	wait
+preview: build ## Serve the web host app's production build on the same port.
+	cd $(HOST_APP) && $(BIN)/vite preview
 
 fmt: ## Format Rust (pinned nightly) and TypeScript.
 	cargo +$(NIGHTLY_TOOLCHAIN) fmt --all
@@ -66,22 +52,19 @@ fmt-check: ## Check formatting without changing files.
 # The wasm32 pass lints the web glue that `#[extension_point]` and
 # `#[host_runtime::constructor]` write, which native builds compile out. Each
 # provider is listed here; see "Add a provider" in `docs/checklists.md`.
-WASM_CRATES := -p protocol -p host-extension -p host-runtime -p host-provider-wallet-mock -p host-provider-notifier-log -p host-app-web-wasm
+WASM_CRATES := -p protocol -p host-extension -p host-runtime -p host-provider-wallet-mock -p host-provider-notifier-log -p product-stand-in -p host-app-web-wasm
 
 clippy: ## Clippy with -D warnings: the native workspace, then the crates in the WASM binary.
 	cargo clippy --workspace --all-targets -- -D warnings
 	cargo clippy $(WASM_CRATES) --target wasm32-unknown-unknown -- -D warnings
 
 typecheck: packages wasm ## Typecheck the TypeScript, tests included.
-	cd $(CLIENT_PKG) && $(BIN)/tsc -p tsconfig.test.json
 	cd $(EXTENSION_PKG) && $(BIN)/tsc -p tsconfig.test.json
-	cd $(PRODUCT_APP) && $(BIN)/tsc -p tsconfig.json
 	cd $(HOST_APP) && $(BIN)/tsc -p tsconfig.test.json
 
 test: packages wasm ## Rust tests (natively, and the web glue's under Node), then the bun tests.
 	cargo test --workspace
 	wasm-pack test --node rust/crates/host-extension
-	cd $(CLIENT_PKG) && $(BUN) test
 	cd $(EXTENSION_PKG) && $(BUN) test
 	cd $(HOST_APP) && $(BUN) test
 
@@ -100,7 +83,7 @@ native: swift kotlin ## Run both native apps.
 clean: ## Remove build and codegen outputs.
 	cargo clean
 	rm -rf js/packages/*/dist $(HOST_APP)/wasm apps/*/dist
-	rm -rf $(CLIENT_PKG)/src/generated $(EXTENSION_PKG)/src/generated
+	rm -rf $(EXTENSION_PKG)/src/generated
 	rm -rf apps/host-app-swift/.build apps/host-app-swift/Sources/HostAppNative apps/host-app-swift/Sources/HostAppNativeFFI
 	rm -rf apps/host-app-kotlin/build apps/host-app-kotlin/.gradle apps/host-app-kotlin/.kotlin
 	find . -name '*.tsbuildinfo' -not -path './node_modules/*' -delete

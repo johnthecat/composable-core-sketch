@@ -6,10 +6,10 @@
 // disconnects the product, the core drops the product's calls, and the host
 // marks the ones still pending as dropped.
 
-import type { ProductAccount } from "@sketch/protocol-client";
 import {
   WalletException,
   type AccountsListener,
+  type ProductAccount,
   type SignRequest,
   type Signature,
   type Wallet,

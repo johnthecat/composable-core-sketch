@@ -8,21 +8,14 @@ use syn::{Item, ItemEnum, parse_quote};
 use crate::extension_type::{ValueKind, add_attributes};
 
 /// Expands `#[extension_error]` on an enum; it takes no arguments.
-pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
-	if !args.is_empty() {
-		return syn::Error::new_spanned(args, "#[extension_error] takes no arguments")
-			.to_compile_error();
-	}
-	let mut item = match syn::parse2::<ItemEnum>(item) {
-		Ok(item) => item,
-		Err(error) => return error.to_compile_error(),
-	};
+pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+	crate::no_arguments(&args, "extension_error")?;
+	let mut item = syn::parse2::<ItemEnum>(item)?;
 	if item.variants.iter().any(|variant| variant.ident == "Unknown") {
-		return syn::Error::new_spanned(
+		return Err(syn::Error::new_spanned(
 			&item.ident,
 			"#[extension_error] adds `Unknown { reason }` itself; declare only the other failures",
-		)
-		.to_compile_error();
+		));
 	}
 	item.variants.push(parse_quote! {
 		/// A failure the trait does not declare.
@@ -33,8 +26,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
 		}
 	});
 	let name = item.ident.clone();
-	let declared = add_attributes(Item::Enum(item), ValueKind::Error);
-	quote! {
+	let declared = add_attributes(Item::Enum(item), ValueKind::Error)?;
+	Ok(quote! {
 		#declared
 
 		/// What a failure the trait does not declare becomes. The web glue calls
@@ -53,5 +46,5 @@ pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
 				error.reason.into()
 			}
 		}
-	}
+	})
 }

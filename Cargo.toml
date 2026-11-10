@@ -4,7 +4,7 @@ members = [
 	"rust/crates/*",
 	"apps/host-app-web/host-app-web-wasm",
 	"apps/host-app-native",
-	"apps/product-native",
+	"apps/product-stand-in",
 ]
 
 [workspace.package]
@@ -43,7 +43,7 @@ host-macros = { path = "rust/crates/host-macros" }
 host-provider-notifier-log = { path = "rust/crates/host-provider-notifier-log" }
 host-provider-wallet-mock = { path = "rust/crates/host-provider-wallet-mock" }
 host-runtime = { path = "rust/crates/host-runtime" }
-product-native = { path = "apps/product-native" }
+product-stand-in = { path = "apps/product-stand-in" }
 protocol = { path = "rust/crates/protocol" }
 
 [workspace.lints.rust]

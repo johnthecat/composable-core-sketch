@@ -1,15 +1,10 @@
-//! Wire ids of protocol traits and methods.
-//!
-//! The ids are emitted as hidden doc tags, so they survive into rustdoc JSON for
-//! `tool-codegen`. Rust rejects unknown helper attributes on trait methods; doc tags
-//! carry the metadata without one.
+//! `#[wire]` and `#[wire_trait]`: the wire ids of protocol methods and traits.
 
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
 	Ident, ItemTrait, LitInt, Token, TraitItemFn,
 	parse::{Parse, ParseStream},
-	parse_macro_input,
 };
 
 /// The `id = N` argument both attributes take.
@@ -33,43 +28,19 @@ impl Parse for WireId {
 	}
 }
 
-/// Re-emit a trait method with its hidden `@wire_id=N` tag.
-pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
-	let WireId(id) = parse_macro_input!(args as WireId);
-	let tag = format!("@wire_id={id}");
-	match syn::parse::<TraitItemFn>(item) {
-		Ok(mut method) => {
-			method.attrs.push(syn::parse_quote!(#[doc = #tag]));
-			quote!(#method).into()
-		},
-		Err(_) => syn::Error::new(
-			proc_macro2::Span::call_site(),
-			"#[wire] can only be applied to trait methods",
-		)
-		.to_compile_error()
-		.into(),
-	}
+/// Checks a trait method's `id = N` and leaves the method as it is.
+pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+	syn::parse2::<WireId>(args)?;
+	let method = syn::parse2::<TraitItemFn>(item)
+		.map_err(|error| syn::Error::new(error.span(), "#[wire] applies to a trait method"))?;
+	Ok(quote!(#method))
 }
 
-/// Re-emit a trait with its hidden `@wire_trait_id=N` tag, followed by its method
-/// table.
-pub fn expand_trait(args: TokenStream, item: TokenStream) -> TokenStream {
-	let WireId(id) = parse_macro_input!(args as WireId);
-	let tag = format!("@wire_trait_id={id}");
-	match syn::parse::<ItemTrait>(item) {
-		Ok(mut item_trait) => {
-			let table = match crate::method_table::method_table(&item_trait, id) {
-				Ok(table) => table,
-				Err(error) => return error.to_compile_error().into(),
-			};
-			item_trait.attrs.push(syn::parse_quote!(#[doc = #tag]));
-			quote!(#item_trait #table).into()
-		},
-		Err(_) => syn::Error::new(
-			proc_macro2::Span::call_site(),
-			"#[wire_trait] can only be applied to traits",
-		)
-		.to_compile_error()
-		.into(),
-	}
+/// The trait, followed by its method table.
+pub fn expand_trait(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+	let WireId(id) = syn::parse2(args)?;
+	let item_trait = syn::parse2::<ItemTrait>(item)
+		.map_err(|error| syn::Error::new(error.span(), "#[wire_trait] applies to a trait"))?;
+	let table = crate::method_table::method_table(&item_trait, id)?;
+	Ok(quote!(#item_trait #table))
 }

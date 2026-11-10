@@ -84,7 +84,7 @@ By hand, for a method:
 1. `rust/crates/protocol/src/api/<service>.rs`: its request, response and error types, deriving `Encode` and
    `Decode`, and the method with the next free `#[wire(id = N)]`, taking `&self` and at most one request.
 2. `rust/crates/host-runtime/src/runtime/capabilities.rs`: its implementation.
-3. `apps/product/src/main.ts`: the product's call.
+3. `apps/product-stand-in/src/lib.rs`: its frame builder, and its arm in `describe_frame`.
 
 For a new service, also:
 
@@ -92,6 +92,6 @@ For a new service, also:
 2. `rust/crates/protocol/src/api.rs`: `<service>::<Trait>` in `services!`, and its row in the id table.
 3. `rust/crates/host-runtime/src/runtime/capabilities.rs`: `impl <Trait> for ProductRuntimeHost`.
 
-Generated: the wire pair constants and method table (by `#[wire_trait]`), and the TypeScript client (`make codegen`).
+Generated: the wire pair constants and method table (by `#[wire_trait]`).
 
 Verify: `make check`.

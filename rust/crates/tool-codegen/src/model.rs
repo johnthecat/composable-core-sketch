@@ -2,8 +2,7 @@
 
 use core::fmt;
 
-/// A type a signature or a field names. A protocol type has a SCALE encoding;
-/// an extension point value crosses as a typed JS value instead.
+/// A type a signature or a field names, as far as its TypeScript type needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeRef {
 	/// `()`.
@@ -20,10 +19,8 @@ pub enum TypeRef {
 	U64,
 	/// `String`.
 	String,
-	/// `Vec<u8>`.
+	/// `Vec<u8>` or `[u8; N]`.
 	Bytes,
-	/// `[u8; N]`, or a type alias of one.
-	FixedBytes(usize),
 	/// `Vec<T>` for any `T` but `u8`.
 	Vec(Box<TypeRef>),
 	/// `Option<T>`.
@@ -45,25 +42,15 @@ impl TypeName {
 		Self { path }
 	}
 
-	/// The defining crate.
-	pub fn crate_name(&self) -> &str {
-		self.path.first().map(String::as_str).unwrap_or_default()
-	}
-
-	/// The name in Rust source, which the TypeScript type and codec share.
+	/// The name in Rust source, which the TypeScript type shares.
 	pub fn rust_name(&self) -> &str {
 		self.path.last().map(String::as_str).unwrap_or_default()
-	}
-
-	/// The full path, starting with the crate name.
-	pub fn rust_path(&self) -> String {
-		self.path.join("::")
 	}
 }
 
 impl fmt::Display for TypeName {
 	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-		formatter.write_str(&self.rust_path())
+		formatter.write_str(&self.path.join("::"))
 	}
 }
 

@@ -1,9 +1,9 @@
-//! Generates the TypeScript side of the sketch from rustdoc JSON: the product
-//! client (`@sketch/protocol-client`) from the protocol crate, and the
-//! extension point interfaces (`@sketch/host-extension`) from the interface crate.
+//! Generates the extension point interfaces of `@sketch/host-extension` from
+//! the interface crate's rustdoc JSON. The protocol crate's rustdoc JSON
+//! supplies the protocol types an extension point names.
 //!
-//! The Rust side needs no generated code: `#[wire_trait]` writes the
-//! protocol's method tables and `#[extension_point]` the web glue.
+//! The Rust side needs no generated code: `#[extension_point]` writes the web
+//! glue and `#[wire_trait]` the protocol's method tables.
 
 use std::{fs, path::Path};
 
@@ -12,12 +12,11 @@ use clap::Parser;
 
 mod extension;
 mod model;
-mod protocol;
 mod rustdoc;
 mod ts;
 
 #[derive(Parser)]
-#[command(about = "Generate the product client and the extension point interfaces")]
+#[command(about = "Generate the extension point interfaces")]
 struct Cli {
 	/// Rustdoc JSON of the protocol crate.
 	#[arg(long)]
@@ -27,13 +26,9 @@ struct Cli {
 	#[arg(long)]
 	extension_input: String,
 
-	/// `src/generated` of `@sketch/protocol-client`.
-	#[arg(long)]
-	client_output: String,
-
 	/// `src/generated` of `@sketch/host-extension`.
 	#[arg(long)]
-	extension_output: String,
+	output: String,
 }
 
 fn main() -> Result<()> {
@@ -41,15 +36,6 @@ fn main() -> Result<()> {
 	let protocol_crate = load(&cli.protocol_input)?;
 	let extension_crate = load(&cli.extension_input)?;
 	let world = rustdoc::World::new(vec![&protocol_crate, &extension_crate]);
-
-	let api = protocol::extract(&world, &protocol_crate).context("reading the protocol")?;
-	let api_types = world.reachable_types(
-		api.iter().flat_map(|api| &api.methods).flat_map(|method| method.type_refs()),
-	)?;
-	let client = Path::new(&cli.client_output);
-	write(client.join("types.ts"), ts::client::types(&api_types))?;
-	write(client.join("wire-table.ts"), ts::client::wire_table(&api))?;
-	write(client.join("client.ts"), ts::client::client(&api))?;
 
 	let extensions = extension::extension_traits(&world, &extension_crate)
 		.context("reading the extension points")?;
@@ -61,8 +47,8 @@ fn main() -> Result<()> {
 		.collect();
 	let types = world.reachable_types(&refs)?;
 	write(
-		Path::new(&cli.extension_output).join("extensions.ts"),
-		ts::extensions::extensions(extension_crate.name()?, &extensions, &types),
+		Path::new(&cli.output).join("extensions.ts"),
+		ts::extensions::extensions(&extensions, &types),
 	)?;
 	Ok(())
 }

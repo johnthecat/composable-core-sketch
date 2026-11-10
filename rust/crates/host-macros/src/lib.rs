@@ -42,11 +42,11 @@ use proc_macro::TokenStream;
 /// ```
 ///
 /// One id addresses every frame of the method; which leg a frame carries is
-/// its `message_type` byte. Expands to the method plus a hidden `@wire_id=N` doc
-/// tag that `tool-codegen` reads from rustdoc JSON.
+/// its `message_type` byte. The method is unchanged: [`macro@wire_trait`]
+/// reads the id into the method table.
 #[proc_macro_attribute]
 pub fn wire(args: TokenStream, item: TokenStream) -> TokenStream {
-	wire::expand(args, item)
+	output(wire::expand(args.into(), item.into()))
 }
 
 /// Mark a protocol trait with its wire id, the first byte of the
@@ -66,7 +66,7 @@ pub fn wire(args: TokenStream, item: TokenStream) -> TokenStream {
 /// without a request takes an empty payload.
 #[proc_macro_attribute]
 pub fn wire_trait(args: TokenStream, item: TokenStream) -> TokenStream {
-	wire::expand_trait(args, item)
+	output(wire::expand_trait(args.into(), item.into()))
 }
 
 /// Mark a protocol payload record that an extension point also carries. It
@@ -75,7 +75,7 @@ pub fn wire_trait(args: TokenStream, item: TokenStream) -> TokenStream {
 /// record, so the protocol copies none by hand.
 #[proc_macro_attribute]
 pub fn protocol_record(args: TokenStream, item: TokenStream) -> TokenStream {
-	extension_type::expand_record(args.into(), item.into()).into()
+	output(extension_type::expand_record(args.into(), item.into()))
 }
 
 /// Declare an extension point: a trait the core calls and a provider, or host
@@ -106,7 +106,7 @@ pub fn protocol_record(args: TokenStream, item: TokenStream) -> TokenStream {
 ///   `<Trait>Exception` whose `error` property holds it.
 #[proc_macro_attribute]
 pub fn extension_point(args: TokenStream, item: TokenStream) -> TokenStream {
-	extension_point::expand(args.into(), item.into()).into()
+	output(extension_point::expand(args.into(), item.into()))
 }
 
 /// Declare a listener: a trait an extension point pushes changes to, which the
@@ -120,7 +120,7 @@ pub fn extension_point(args: TokenStream, item: TokenStream) -> TokenStream {
 /// because the caller has nowhere to receive it.
 #[proc_macro_attribute]
 pub fn extension_listener(args: TokenStream, item: TokenStream) -> TokenStream {
-	extension_listener::expand(args.into(), item.into()).into()
+	output(extension_listener::expand(args.into(), item.into()))
 }
 
 /// Declare an extension point's error, named `<Trait>Error`.
@@ -134,7 +134,7 @@ pub fn extension_listener(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Each declared variant carries its own `#[error("…")]` message.
 #[proc_macro_attribute]
 pub fn extension_error(args: TokenStream, item: TokenStream) -> TokenStream {
-	extension_error::expand(args.into(), item.into()).into()
+	output(extension_error::expand(args.into(), item.into()))
 }
 
 /// Declare a record or enum an extension point names. The attribute adds the
@@ -143,7 +143,7 @@ pub fn extension_error(args: TokenStream, item: TokenStream) -> TokenStream {
 /// `Vec<u8>` or `[u8; N]`. Other derives are the type's own.
 #[proc_macro_attribute]
 pub fn extension_type(args: TokenStream, item: TokenStream) -> TokenStream {
-	extension_type::expand(args.into(), item.into()).into()
+	output(extension_type::expand(args.into(), item.into()))
 }
 
 /// Name the TypeScript module an interface crate's extension points are
@@ -157,7 +157,7 @@ pub fn extension_type(args: TokenStream, item: TokenStream) -> TokenStream {
 /// cannot leave it out.
 #[proc_macro]
 pub fn typescript_module(input: TokenStream) -> TokenStream {
-	typescript_module::expand(input.into()).into()
+	output(typescript_module::expand(input.into()))
 }
 
 /// Export a host crate's runtime constructor: through UniFFI natively, and
@@ -168,7 +168,20 @@ pub fn typescript_module(input: TokenStream) -> TokenStream {
 /// method, when an object lacks one.
 #[proc_macro_attribute]
 pub fn constructor(args: TokenStream, item: TokenStream) -> TokenStream {
-	constructor::expand(args.into(), item.into()).into()
+	output(constructor::expand(args.into(), item.into()))
+}
+
+/// A macro's expansion, or its error as a compile error.
+fn output(expansion: syn::Result<proc_macro2::TokenStream>) -> TokenStream {
+	expansion.unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Fails unless the attribute `name` was given no arguments.
+fn no_arguments(args: &proc_macro2::TokenStream, name: &str) -> syn::Result<()> {
+	match args.is_empty() {
+		true => Ok(()),
+		false => Err(syn::Error::new_spanned(args, format!("#[{name}] takes no arguments"))),
+	}
 }
 
 /// The namespace the `.d.ts` imports an interface crate's TypeScript module

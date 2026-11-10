@@ -5,7 +5,7 @@ the host uses into one library, and declares the runtime constructor once. It bu
 app](../host-app-swift/README.md) and a dynamic one for the [Kotlin app](../host-app-kotlin/README.md).
 
 Each crate it links keeps its own UniFFI namespace, so the library also carries the providers' exports (`MockPhone`,
-`log_notifier`) and the stand-in product's frame builders ([product-native](../product-native/README.md)). Why it reads
+`log_notifier`) and the stand-in product's frame builders ([product-stand-in](../product-stand-in/README.md)). Why it reads
 the same as [host-app-web-wasm](../host-app-web/host-app-web-wasm/README.md): see "One host crate per host" in
 [docs/departures-from-the-rfc.md](../../docs/departures-from-the-rfc.md).
 

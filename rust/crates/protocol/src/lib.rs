@@ -4,8 +4,8 @@
 //! [`api`] declares one trait per service, each method tagged with its wire id.
 //! The request, response and error types a trait carries sit next to it.
 //! `#[wire_trait]` writes each trait's method table ([`dispatch`]), which the
-//! host runtime serves; `tool-codegen` reads this crate's rustdoc JSON to
-//! generate the TypeScript product client.
+//! host runtime serves; `tool-codegen` reads this crate's rustdoc JSON for
+//! the protocol types an extension point names.
 //!
 //! This crate holds no runtime, so an interface crate may name its types in
 //! extension point signatures without depending on the core.
@@ -31,7 +31,7 @@ uniffi::setup_scaffolding!();
 
 /// How a call failed: with the method's own error, or for a reason any method
 /// can fail with.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 pub enum CallError<D> {
 	/// The method's own error.
 	Domain(D),

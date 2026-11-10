@@ -1,14 +1,13 @@
 # tool-codegen
 
-Generates the TypeScript side of the sketch from rustdoc JSON. `make codegen` runs it through
-[`scripts/codegen.sh`](../../../scripts/codegen.sh). It writes the client of
-[@sketch/protocol-client](../../../js/packages/protocol-client/README.md) from the protocol crate, and the interfaces of
-[@sketch/host-extension](../../../js/packages/host-extension/README.md) from the interface crate.
+Generates the TypeScript interfaces of [@sketch/host-extension](../../../js/packages/host-extension/README.md) from the
+interface crate's rustdoc JSON, with the protocol types an extension point names. `make codegen` runs it through
+[`scripts/codegen.sh`](../../../scripts/codegen.sh). It writes no Rust.
 
 ## Look at
 
-1. [`src/ts/client.rs`](src/ts/client.rs): the TypeScript client written from rustdoc JSON.
-2. [`src/ts/extensions.rs`](src/ts/extensions.rs): the extension point interfaces.
+1. [`src/ts/extensions.rs`](src/ts/extensions.rs): the extension point interfaces and their exception classes.
+2. [`src/extension.rs`](src/extension.rs): how it reads an extension point from rustdoc JSON.
 
 ## Tests
 

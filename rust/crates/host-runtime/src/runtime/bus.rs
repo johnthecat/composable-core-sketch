@@ -1,10 +1,12 @@
 //! Fans the values an extension point pushes out to every product subscription
 //! following them, as truapi's `NativeEventBus` does for the theme.
 
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::Mutex;
 
 use futures::channel::mpsc;
 use host_extension::wallet::{AccountsListener, ProductAccount};
+
+use crate::calls::lock;
 
 /// One sender per live product subscription following a `T`.
 pub struct Bus<T> {
@@ -38,8 +40,4 @@ impl AccountsListener for Bus<Vec<ProductAccount>> {
 	fn accounts_changed(&self, accounts: Vec<ProductAccount>) {
 		self.publish(accounts);
 	}
-}
-
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-	mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }

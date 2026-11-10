@@ -10,16 +10,16 @@
       <h1>Composable Core sketch</h1>
       <p>
         One WASM binary holds the core and the providers this app links. The
-        page implements storage and confirmation itself, picks a wallet and a
-        notifier, and frames a product that talks to the core only through
-        protocol frames.
+        page implements storage and confirmation itself, and picks a wallet and
+        a notifier. A stand-in product drives the core with protocol frames,
+        the same frames on every host.
       </p>
       <p id="boot-status" class="muted">Loading the WASM binary…</p>
     </header>
     <main>
       <section aria-labelledby="composition-title">
         <h2 id="composition-title">Composition</h2>
-        <p class="muted">Changing it rebuilds the host runtime and reloads the product.</p>
+        <p class="muted">Changing it rebuilds the host runtime and reconnects the product.</p>
         <fieldset>
           <legend>Wallet extension point</legend>
           <label><input type="radio" name="wallet" value="tracked" checked /> Mock provider, wrapped by host code that tracks each request</label>
@@ -68,13 +68,34 @@
       </section>
 
       <section aria-labelledby="product-title" class="wide">
-        <h2 id="product-title">Product, in an iframe</h2>
+        <h2 id="product-title">Stand-in product</h2>
         <p class="muted">
-          Reloading disconnects the product: the core drops the calls it still
-          has in flight, such as a sign the phone never answers.
+          Each button sends the frame a product would send. The composition
+          never changes these frames. Reconnecting frees the product runtime:
+          the core drops the calls it still has in flight, such as a sign the
+          phone never answers.
         </p>
-        <button type="button" id="reload-product" class="secondary">Reload the product</button>
-        <div id="product-frame" class="product-frame"></div>
+        <div class="row">
+          <input id="product-text" value="hello" aria-label="Text the product sends" />
+          <button type="button" id="product-sign">Sign</button>
+          <button type="button" id="product-accounts">Get accounts</button>
+          <button type="button" id="product-follow">Follow accounts</button>
+          <button type="button" id="product-write">Write a note</button>
+          <button type="button" id="product-read">Read the note</button>
+          <button type="button" id="product-notify">Notify</button>
+          <button type="button" id="reload-product" class="secondary">Reconnect the product</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Call</th>
+              <th>Leg</th>
+              <th>Frame the core sent</th>
+            </tr>
+          </thead>
+          <tbody id="frames"></tbody>
+        </table>
       </section>
 
       <section aria-labelledby="requests-title" class="wide">

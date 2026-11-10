@@ -13,10 +13,10 @@ use futures::{
 	future::BoxFuture,
 	stream::{BoxStream, Stream},
 };
-use parity_scale_codec::Encode;
+use parity_scale_codec::{Decode, Encode};
 
-/// Wire pair of one protocol method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Wire pair of one protocol method, encoded as its two bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Encode, Decode)]
 pub struct MethodIds {
 	/// Trait id.
 	pub trait_id: u8,
@@ -39,10 +39,9 @@ pub type SubscriptionStream = BoxStream<'static, SubscriptionOutput>;
 /// `Result<Response, CallError<Error>>`.
 pub type RequestHandler<H> = fn(Arc<H>, Vec<u8>) -> BoxFuture<'static, Vec<u8>>;
 
-/// Starts a subscription: its frames, or the encoded interrupt that ends it
-/// before it starts.
-pub type SubscriptionHandler<H> =
-	fn(Arc<H>, Vec<u8>) -> BoxFuture<'static, Result<SubscriptionStream, Vec<u8>>>;
+/// Starts a subscription: its frames, which a request that does not decode
+/// ends at once.
+pub type SubscriptionHandler<H> = fn(Arc<H>, Vec<u8>) -> BoxFuture<'static, SubscriptionStream>;
 
 /// How a method is served.
 pub enum Handler<H> {
@@ -70,12 +69,7 @@ where
 	stream
 		.map(|item| match item {
 			Ok(item) => SubscriptionOutput::Item(item.encode()),
-			Err(interrupt) => SubscriptionOutput::Interrupt(subscription_interrupt(interrupt)),
+			Err(interrupt) => SubscriptionOutput::Interrupt(Err::<(), _>(interrupt).encode()),
 		})
 		.boxed()
-}
-
-/// Encode a subscription's interrupt value as `Err(interrupt)`.
-pub fn subscription_interrupt<Interrupt: Encode>(interrupt: Interrupt) -> Vec<u8> {
-	Err::<(), Interrupt>(interrupt).encode()
 }

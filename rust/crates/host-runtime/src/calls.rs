@@ -2,6 +2,7 @@
 //! response, and running subscriptions. Each runs on the spawner until it
 //! finishes or the product stops it. Dropping the connection ends it too.
 
+use core::pin::pin;
 use std::{
 	collections::HashMap,
 	sync::{Arc, Mutex, MutexGuard, PoisonError},
@@ -77,21 +78,17 @@ impl LiveCalls {
 	}
 
 	/// Start the subscription `request_id`, then pump its items into frames for
-	/// `sink` until it ends. A start that fails sends its interrupt; a stream
-	/// that runs dry ends with a clean interrupt.
+	/// `sink` until it ends. A stream that runs dry ends with a clean interrupt.
 	pub fn subscription(
 		&self,
 		request_id: String,
 		ids: MethodIds,
-		start: BoxFuture<'static, Result<SubscriptionStream, Vec<u8>>>,
+		start: BoxFuture<'static, SubscriptionStream>,
 		sink: Arc<dyn FrameSink>,
 	) {
 		let reply = Reply { request_id: request_id.clone(), ids, sink };
 		self.run(request_id, async move {
-			let mut stream = match start.await {
-				Ok(stream) => stream,
-				Err(interrupt) => return reply.send(MESSAGE_TYPE_INTERRUPT, interrupt),
-			};
+			let mut stream = start.await;
 			loop {
 				match stream.next().await {
 					Some(SubscriptionOutput::Item(value)) => {
@@ -122,7 +119,7 @@ impl LiveCalls {
 			stops.insert(request_id, stop_sender);
 		}
 		(self.spawner)(Box::pin(async move {
-			select(stopped, Box::pin(call)).await;
+			select(stopped, pin!(call)).await;
 		}));
 	}
 }
@@ -136,11 +133,18 @@ struct Reply {
 
 impl Reply {
 	fn send(&self, message_type: u8, value: Vec<u8>) {
-		let frame = ProtocolMessage::new(self.request_id.clone(), self.ids, message_type, value);
+		let frame = ProtocolMessage {
+			request_id: self.request_id.clone(),
+			ids: self.ids,
+			message_type,
+			value,
+		};
 		self.sink.emit_frame(Bytes(frame.encode()));
 	}
 }
 
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+/// Locks `mutex`, ignoring poison: no lock in the core is held across code
+/// that can leave its data half-written.
+pub fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 	mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }

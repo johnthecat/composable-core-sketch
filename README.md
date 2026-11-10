@@ -5,7 +5,8 @@ truapi's architecture.
 
 ## What the sketch shows
 
-- A product reaches the core only through protocol frames, sent by a client generated from the protocol crate.
+- The RFC leaves products as they are: a product reaches the core only through protocol frames. So every host here
+  drives the core with the same stand-in product, which builds those frames from the protocol crate's own types.
 - Everything a host supplies to the core is declared in one interface crate:
   - the extension points `ProductStorage` and `UserConfirmation`, which every host passes;
   - `Wallet` and `Notifier`, which a host may leave out;
@@ -46,7 +47,6 @@ Open them in this order. Each README says what to look at in the package and wha
 
 - [`host-app-web-wasm`](apps/host-app-web/host-app-web-wasm/README.md): the web host's crate, linking the core and its
   providers into one WASM binary.
-- [`@sketch/host`](js/packages/host/README.md): framing a product and connecting it to a runtime.
 - [`@sketch/host-app-web`](apps/host-app-web/README.md): the web host app.
 - [`host-app-native`](apps/host-app-native/README.md): the native host's crate, linking the core and its providers into
   one library.
@@ -55,10 +55,7 @@ Open them in this order. Each README says what to look at in the package and wha
 
 **Product**
 
-- [`@sketch/product`](apps/product/README.md): the product page the web host frames.
-- [`@sketch/protocol-client`](js/packages/protocol-client/README.md): the product's client, generated from the protocol
-  crate.
-- [`product-native`](apps/product-native/README.md): the stand-in product of the native apps.
+- [`product-stand-in`](apps/product-stand-in/README.md): the stand-in product every host drives the core with.
 
 **Tools**
 
@@ -71,7 +68,7 @@ Install the prerequisites listed in [docs/development.md](docs/development.md), 
 
 ```sh
 make setup
-make dev      # the web host app on http://localhost:5181, framing the product from :5182
+make dev      # the web host app on http://localhost:5181
 make swift    # the Swift app
 make kotlin   # the Kotlin app
 make check    # formatting and lints, then typechecks and tests

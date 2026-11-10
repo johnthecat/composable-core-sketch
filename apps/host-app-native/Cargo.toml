@@ -13,7 +13,7 @@ crate-type = ["cdylib", "staticlib"]
 host-provider-notifier-log.workspace = true
 host-provider-wallet-mock.workspace = true
 host-runtime.workspace = true
-product-native.workspace = true
+product-stand-in.workspace = true
 uniffi.workspace = true
 
 [lints]

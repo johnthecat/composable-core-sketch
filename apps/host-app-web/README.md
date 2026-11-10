@@ -1,7 +1,8 @@
 # @sketch/host-app-web
 
 The web host app. It builds its WASM binary from [host-app-web-wasm](host-app-web-wasm/README.md) and implements storage
-and confirmation on the page. Then it picks the providers and frames the [product](../product/README.md).
+and confirmation on the page. Then it picks the providers and drives the core with
+[product-stand-in](../product-stand-in/README.md).
 
 ## Look at
 
@@ -9,6 +10,7 @@ and confirmation on the page. Then it picks the providers and frames the [produc
 2. [`src/tracking-wallet.ts`](src/tracking-wallet.ts): host code around the wallet provider.
 3. [`src/ts-wallet.ts`](src/ts-wallet.ts): a wallet written only in TypeScript.
 4. [`src/host-extensions.ts`](src/host-extensions.ts): storage and confirmation on the page.
+5. [`src/stand-in-product.ts`](src/stand-in-product.ts): the stand-in product's frames sent into a product runtime.
 
 ## The page
 
@@ -23,14 +25,14 @@ and confirmation on the page. Then it picks the providers and frames the [produc
 - how the user confirmation answers;
 - how and when the simulated phone answers sign requests.
 
-The app adds accounts, which the product's subscription sees, and reloads the product, which drops its calls in flight.
-A missing wallet or notifier makes the product calls that need it fail as `Unsupported`. Append `?product=<url>` to
-frame another product.
+The app adds accounts, which the product's subscription sees. The stand-in product's buttons send one frame each, and
+the page lists every frame the core sends back. Reconnecting the product frees its product runtime, which drops its
+calls in flight. A missing wallet or notifier makes the product calls that need it fail as `Unsupported`.
 
 ## Tests
 
-[`src/composition.test.ts`](src/composition.test.ts) checks the glue through the app's real WASM binary, with the
-product's generated client on the far end of a `MessageChannel`:
+[`src/composition.test.ts`](src/composition.test.ts) checks the glue through the app's real WASM binary, driven by the
+stand-in product's frames:
 
 - a signature through the tracking wallet;
 - a declined request;
@@ -43,4 +45,4 @@ product's generated client on the far end of a `MessageChannel`:
 
 ## Next
 
-- [@sketch/host](../../js/packages/host/README.md), which frames the product and connects it.
+- [product-stand-in](../product-stand-in/README.md), the frames the page sends.

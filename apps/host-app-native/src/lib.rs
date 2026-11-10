@@ -12,7 +12,7 @@ use host_runtime::{
 // Links the providers' exports, and the stand-in product's, into the library.
 use host_provider_notifier_log as _;
 use host_provider_wallet_mock as _;
-use product_native as _;
+use product_stand_in as _;
 
 uniffi::setup_scaffolding!();
 

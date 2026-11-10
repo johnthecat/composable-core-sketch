@@ -1,7 +1,7 @@
 # host-app-kotlin
 
 A Kotlin host app on the JVM. It loads the library of [host-app-native](../host-app-native/README.md) and plays a
-product with [product-native](../product-native/README.md). `make kotlin` builds and runs it.
+product with [product-stand-in](../product-stand-in/README.md). `make kotlin` builds and runs it.
 
 ## Look at
 

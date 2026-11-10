@@ -20,14 +20,14 @@ scripts it runs.
 | `make setup`     | `npm install`, the pinned nightly with rustfmt, the wasm32 target                                                |
 | `make codegen`   | `scripts/codegen.sh`: rustdoc JSON of `protocol` and `host-extension`, one `tool-codegen` run, prettier          |
 | `make wasm`      | `scripts/build-wasm.mjs`: `wasm-pack build --target web` of `host-app-web-wasm` into `apps/host-app-web/wasm/`   |
-| `make packages`  | `codegen`, then `tsc -b` for `@sketch/protocol-client`, `@sketch/host-extension` and `@sketch/host`              |
-| `make build`     | `packages` and `wasm`, then typecheck and `vite build` for `apps/product` and `apps/host-app-web`                |
-| `make dev`       | `packages` and `wasm`, then Vite for the host app on :5181 and the product on :5182                              |
-| `make preview`   | `build`, then the production builds on the same ports                                                            |
+| `make packages`  | `codegen`, then `tsc -b` for `@sketch/host-extension`                                                          |
+| `make build`     | `packages` and `wasm`, then typecheck and `vite build` for `apps/host-app-web`                                 |
+| `make dev`       | `packages` and `wasm`, then Vite for the host app on :5181                                                       |
+| `make preview`   | `build`, then the production build on the same port                                                            |
 | `make fmt`       | `cargo +<nightly> fmt --all` and prettier; `make fmt-check` checks only                                          |
 | `make clippy`    | clippy with `-D warnings` on the native workspace, then on wasm32 for the crates in `WASM_CRATES`                |
-| `make typecheck` | `packages` and `wasm`, then `tsc` over the packages and both apps, tests included                                |
-| `make test`      | `packages` and `wasm`, then `cargo test --workspace`, `wasm-pack test --node rust/crates/host-extension`, and `bun test` in `protocol-client`, `host-extension` and `host-app-web` |
+| `make typecheck` | `packages` and `wasm`, then `tsc` over the package and the app, tests included                                  |
+| `make test`      | `packages` and `wasm`, then `cargo test --workspace`, `wasm-pack test --node rust/crates/host-extension`, and `bun test` in `host-extension` and `host-app-web` |
 | `make check`     | `codegen`, `fmt-check`, `clippy`, `typecheck`, `test`                                                            |
 | `make swift`     | `scripts/native-bindings.sh swift` (builds `host-app-native`, generates bindings), `swift run HostAppSwift`      |
 | `make kotlin`    | `scripts/native-bindings.sh kotlin`, `./gradlew run`                                                             |

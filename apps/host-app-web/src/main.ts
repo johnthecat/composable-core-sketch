@@ -1,14 +1,8 @@
 // The host page: builds the core over the extension points it implements and
-// the providers it picks, and frames the product.
+// the providers it picks, and drives it with the stand-in product.
 
 import "./style.css";
 
-import {
-  connectProductPort,
-  createIframeHost,
-  type HostRuntime,
-  type IframeHost,
-} from "@sketch/host";
 import type {
   Notifier,
   UserConfirmationReview,
@@ -16,14 +10,22 @@ import type {
 } from "@sketch/host-extension";
 
 import init, {
+  FrameLeg,
+  getAccountsFrame,
   hostRuntime,
   logNotifier,
   MockPhone,
   PhoneDecision,
+  pushNotificationFrame,
+  signRawFrame,
+  storageReadFrame,
+  storageWriteFrame,
+  type HostRuntime,
 } from "../wasm/host_app_web_wasm.js";
 import {
   memoryStorage,
   pageConfirmation,
+  showingNotifier,
   type ConfirmationMode,
 } from "./host-extensions.js";
 import {
@@ -32,6 +34,7 @@ import {
   type TrackingWallet,
   type WalletRequest,
 } from "./tracking-wallet.js";
+import { StandInProduct, type Frame } from "./stand-in-product.js";
 import { TypeScriptWallet } from "./ts-wallet.js";
 
 type WalletChoice = "tracked" | "provider" | "typescript" | "none";
@@ -51,16 +54,10 @@ function checked<T extends string>(name: string): T {
   return input.value as T;
 }
 
-/**
- * The product app, on its own origin. `?product=<url>` frames another one,
- * the way a host loads whichever product the user opens.
- */
-const productUrl =
-  new URLSearchParams(window.location.search).get("product") ??
-  "http://localhost:5182/";
-
 const bootStatus = element<HTMLParagraphElement>("boot-status");
-const productFrame = element<HTMLDivElement>("product-frame");
+const frameRows = element<HTMLTableSectionElement>("frames");
+const productText = element<HTMLInputElement>("product-text");
+const followButton = element<HTMLButtonElement>("product-follow");
 const requestRows = element<HTMLTableSectionElement>("requests");
 const notice = element<HTMLParagraphElement>("notice");
 
@@ -84,7 +81,8 @@ async function main(): Promise<void> {
   // may still settle a call; only the current one draws.
   let composition = 0;
   let tracking: TrackingWallet | undefined;
-  const wallet = (choice: WalletChoice): Wallet | undefined => {
+  let currentWallet: Wallet | undefined;
+  const pickWallet = (choice: WalletChoice): Wallet | undefined => {
     const current = composition;
     tracking = undefined;
     switch (choice) {
@@ -101,39 +99,39 @@ async function main(): Promise<void> {
         return undefined;
     }
   };
-  // Host code around the log provider, as in the RFC's example: it shows each
-  // notice on the page, then lets the provider log it.
-  const notifier = (choice: NotifierChoice): Notifier | undefined => {
-    if (choice === "none") return undefined;
-    const inner = logNotifier();
-    return {
-      async notify(text) {
-        notice.textContent = `Notice: ${text}`;
-        await inner.notify(text);
-      },
-    };
-  };
+  const notifier = (choice: NotifierChoice): Notifier | undefined =>
+    choice === "none"
+      ? undefined
+      : showingNotifier(logNotifier(), (text) => {
+          notice.textContent = `Notice: ${text}`;
+        });
 
-  // Framing the product connects it to the runtime; disconnecting frees its
-  // product runtime, which drops the calls it still has in flight.
+  // Connecting the product gives it a product runtime; disconnecting frees
+  // it, which drops the calls it still has in flight.
   let runtime: HostRuntime | undefined;
-  let framed: { host: IframeHost; disconnect: () => void } | undefined;
-  const frameProduct = (current: HostRuntime) => {
-    const host = createIframeHost({
-      iframeUrl: productUrl,
-      container: productFrame,
-    });
-    const disconnect = connectProductPort(
-      current,
-      { productId: "sketch-product" },
-      host.port,
+  let product: StandInProduct | undefined;
+  let stopFollowing: (() => void) | undefined;
+  const labels = new Map<string, string>();
+  const logFrame = (frame: Frame) => {
+    const label = labels.get(frame.requestId) ?? "accountsSubscribe";
+    if (frame.leg !== FrameLeg.Item) labels.delete(frame.requestId);
+    const row = document.createElement("tr");
+    row.append(
+      ...[frame.requestId, label, FrameLeg[frame.leg], frame.outcome].map(cell),
     );
-    framed = { host, disconnect };
+    frameRows.prepend(row);
+    while (frameRows.rows.length > 50) frameRows.lastElementChild?.remove();
+  };
+  const connectProduct = (current: HostRuntime) => {
+    // Request ids restart with each connection.
+    labels.clear();
+    product = new StandInProduct(current, "sketch-product", logFrame);
   };
   const disconnectProduct = () => {
-    framed?.disconnect();
-    framed?.host.dispose();
-    framed = undefined;
+    stopFollowing = undefined;
+    followButton.textContent = "Follow accounts";
+    product?.disconnect();
+    product = undefined;
     tracking?.callsDropped();
   };
   const compose = () => {
@@ -142,21 +140,71 @@ async function main(): Promise<void> {
     composition += 1;
     renderRequests([]);
     notice.textContent = "";
-    const current = hostRuntime(
+    const walletChoice = checked<WalletChoice>("wallet");
+    const notifierChoice = checked<NotifierChoice>("notifier");
+    currentWallet = pickWallet(walletChoice);
+    runtime = hostRuntime(
       storage,
       confirmation,
-      wallet(checked<WalletChoice>("wallet")),
-      notifier(checked<NotifierChoice>("notifier")),
+      currentWallet,
+      notifier(notifierChoice),
     );
-    runtime = current;
-    frameProduct(current);
-    bootStatus.textContent = `Composed: wallet ${checked("wallet")}, notifier ${checked("notifier")}.`;
+    connectProduct(runtime);
+    bootStatus.textContent = `Composed: wallet ${walletChoice}, notifier ${notifierChoice}.`;
   };
   element("reload-product").addEventListener("click", () => {
     if (runtime === undefined) return;
     disconnectProduct();
-    frameProduct(runtime);
+    connectProduct(runtime);
   });
+
+  // The product's buttons. Each sends the frame a product would send.
+  const send = (label: string, build: (requestId: string) => Uint8Array) => {
+    void product?.call((requestId) => {
+      labels.set(requestId, label);
+      return build(requestId);
+    });
+  };
+  const text = () => new TextEncoder().encode(productText.value);
+  element("product-sign").addEventListener("click", async () => {
+    // The stand-in signs with the wallet's first account; without a wallet
+    // the core answers Unsupported whatever the key.
+    const [first] = (await currentWallet?.accounts()) ?? [];
+    const publicKey = first?.publicKey ?? new Uint8Array(32);
+    send("signRaw", (requestId) => signRawFrame(requestId, publicKey, text()));
+  });
+  element("product-accounts").addEventListener("click", () =>
+    send("getAccounts", getAccountsFrame),
+  );
+  followButton.addEventListener("click", () => {
+    if (product === undefined) return;
+    if (stopFollowing === undefined) {
+      stopFollowing = product.followAccounts();
+      followButton.textContent = "Stop following accounts";
+      return;
+    }
+    stopFollowing();
+    stopFollowing = undefined;
+    followButton.textContent = "Follow accounts";
+    // The core serves frames in order, so once this call is answered it has
+    // served the stop: no item of the subscription can follow.
+    send("getAccounts, after the stop", getAccountsFrame);
+  });
+  element("product-write").addEventListener("click", () =>
+    send("localStorage.write", (requestId) =>
+      storageWriteFrame(requestId, "note", text()),
+    ),
+  );
+  element("product-read").addEventListener("click", () =>
+    send("localStorage.read", (requestId) =>
+      storageReadFrame(requestId, "note"),
+    ),
+  );
+  element("product-notify").addEventListener("click", () =>
+    send("pushNotification", (requestId) =>
+      pushNotificationFrame(requestId, productText.value),
+    ),
+  );
 
   for (const input of document.querySelectorAll<HTMLInputElement>(
     'input[name="wallet"], input[name="notifier"]',

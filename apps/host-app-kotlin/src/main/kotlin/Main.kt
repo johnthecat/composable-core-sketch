@@ -4,9 +4,9 @@
 // to see every request the core sends to it, and plays a product by sending
 // protocol frames.
 //
-// A native app has no TypeScript client, so the product's frames come from the
-// stand-in product's frame builders (`signRawFrame`, `describeFrame`, ...): built
-// from the protocol crate's types, they are the bytes a product's client sends.
+// The product's frames come from the stand-in product (`signRawFrame`,
+// `describeFrame`, ...), the same one the web host app drives the core with.
+// Built from the protocol crate's types, they are the bytes a product sends.
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -28,15 +28,15 @@ import uniffi.host_extension.Wallet
 import uniffi.host_extension.WalletException
 import uniffi.host_runtime.ProductRuntime
 import uniffi.host_provider_notifier_log.logNotifier
-import uniffi.product_native.FrameLeg
-import uniffi.product_native.accountsSubscribeFrame
-import uniffi.product_native.accountsUnsubscribeFrame
-import uniffi.product_native.describeFrame
-import uniffi.product_native.getAccountsFrame
-import uniffi.product_native.pushNotificationFrame
-import uniffi.product_native.signRawFrame
-import uniffi.product_native.storageReadFrame
-import uniffi.product_native.storageWriteFrame
+import uniffi.product_stand_in.FrameLeg
+import uniffi.product_stand_in.accountsSubscribeFrame
+import uniffi.product_stand_in.accountsUnsubscribeFrame
+import uniffi.product_stand_in.describeFrame
+import uniffi.product_stand_in.getAccountsFrame
+import uniffi.product_stand_in.pushNotificationFrame
+import uniffi.product_stand_in.signRawFrame
+import uniffi.product_stand_in.storageReadFrame
+import uniffi.product_stand_in.storageWriteFrame
 import uniffi.protocol.ProductAccount
 import uniffi.host_provider_wallet_mock.MockPhone
 import uniffi.host_provider_wallet_mock.PhoneDecision

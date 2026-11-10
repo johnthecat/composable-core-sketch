@@ -11,39 +11,28 @@ use crate::{
 };
 
 /// Expands `#[extension_point]` on `item`, which takes no arguments.
-pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
-	if !args.is_empty() {
-		return syn::Error::new_spanned(args, "#[extension_point] takes no arguments")
-			.to_compile_error();
-	}
-	let item = match syn::parse2::<ItemTrait>(item) {
-		Ok(item) => item,
-		Err(error) => return error.to_compile_error(),
-	};
+pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+	crate::no_arguments(&args, "extension_point")?;
+	let item = syn::parse2::<ItemTrait>(item)?;
 	let error_name = format!("{}Error", item.ident);
-	let exception = format!("{}Exception", item.ident);
 	let methods = item
 		.items
 		.iter()
-		.map(|method| self::method(method, &error_name, &exception))
-		.collect::<syn::Result<Vec<_>>>();
-	let methods = match methods {
-		Ok(methods) => methods,
-		Err(error) => return error.to_compile_error(),
-	};
+		.map(|method| self::method(method, &error_name))
+		.collect::<syn::Result<Vec<_>>>()?;
 	let glue = web_glue(&item.ident, &methods);
-	quote! {
+	Ok(quote! {
 		#[cfg_attr(not(target_arch = "wasm32"), ::uniffi::export(rust, foreign))]
 		#[::async_trait::async_trait]
 		#item
 
 		#glue
-	}
+	})
 }
 
 /// A call, `async fn … -> Result<T, <Trait>Error>`, or a listener handed over
 /// with `fn set_<value>_listener(&self, listener: Arc<dyn L>)`.
-fn method<'a>(item: &'a TraitItem, error_name: &str, exception: &str) -> syn::Result<Method<'a>> {
+fn method<'a>(item: &'a TraitItem, error_name: &str) -> syn::Result<Method<'a>> {
 	let TraitItem::Fn(method) = item else {
 		return Err(syn::Error::new_spanned(item, "an extension point declares methods only"));
 	};
@@ -66,7 +55,7 @@ fn method<'a>(item: &'a TraitItem, error_name: &str, exception: &str) -> syn::Re
 			));
 		}
 		reject_raw_bytes(ok)?;
-		Shape::Call { ok, error, exception: exception.to_string() }
+		Shape::Call { ok, error }
 	} else {
 		let name = method.sig.ident.to_string();
 		let listener = match method.sig.inputs.iter().nth(1) {

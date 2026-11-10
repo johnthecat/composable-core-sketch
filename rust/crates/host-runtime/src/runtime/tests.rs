@@ -160,7 +160,7 @@ struct Fixture {
 impl Fixture {
 	/// Send the product's frame, then run every call until it waits.
 	fn send(&mut self, ids: MethodIds, message_type: u8, value: Vec<u8>) {
-		let frame = ProtocolMessage::new("p:1".into(), ids, message_type, value);
+		let frame = ProtocolMessage { request_id: "p:1".into(), ids, message_type, value };
 		self.runtime.receive_frame(frame.encode()).unwrap();
 		self.run();
 	}
@@ -206,7 +206,7 @@ fn sign_raw(
 	let request = HostSignRawRequest { public_key, payload: Bytes(b"hi".to_vec()) };
 	fixture.send(SIGNING_SIGN_RAW, MESSAGE_TYPE_REQUEST, request.encode());
 	let [response] = fixture.sink.take().try_into().unwrap();
-	Decode::decode(&mut response.payload.value.as_slice()).unwrap()
+	Decode::decode(&mut response.value.as_slice()).unwrap()
 }
 
 #[test]
@@ -269,7 +269,7 @@ fn a_notifier_refusal_reaches_the_product_as_its_domain_error() {
 
 	assert_eq!(
 		Result::<(), CallError<HostPushNotificationError>>::decode_all(
-			&mut response.payload.value.as_slice()
+			&mut response.value.as_slice()
 		),
 		Ok(Err(CallError::Domain(HostPushNotificationError::Unknown {
 			reason: "refused: muted".into()
@@ -302,7 +302,7 @@ fn account_items(sink: &RecordingSink) -> Vec<usize> {
 		.into_iter()
 		.map(|message| {
 			let item: HostAccountAccountsSubscribeItem =
-				Decode::decode(&mut message.payload.value.as_slice()).unwrap();
+				Decode::decode(&mut message.value.as_slice()).unwrap();
 			item.accounts.len()
 		})
 		.collect()

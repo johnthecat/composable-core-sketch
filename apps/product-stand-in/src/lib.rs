@@ -1,5 +1,6 @@
-//! A stand-in product for the Swift and Kotlin demos: it encodes a product's
-//! frames with the protocol crate's own types and reads frames back as text.
+//! A stand-in product for every demo host: it encodes a product's frames with
+//! the protocol crate's own types and reads frames back as text. Each function
+//! is exported through UniFFI natively and through wasm-bindgen on the web.
 //!
 //! `README.md` describes its role in the demo.
 
@@ -25,14 +26,18 @@ use protocol::{
 	dispatch::MethodIds,
 	frame::{
 		MESSAGE_TYPE_INTERRUPT, MESSAGE_TYPE_REQUEST, MESSAGE_TYPE_RESPONSE, MESSAGE_TYPE_STOP,
-		Payload, ProtocolMessage,
+		ProtocolMessage,
 	},
 };
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
+#[cfg(not(target_arch = "wasm32"))]
 uniffi::setup_scaffolding!();
 
 /// Which leg of a method's exchange a frame from the host carries.
-#[derive(uniffi::Enum)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(uniffi::Enum))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen, derive(Clone))]
 pub enum FrameLeg {
 	/// A request's response.
 	Response,
@@ -45,68 +50,102 @@ pub enum FrameLeg {
 }
 
 /// A frame the host sent to the product, as text.
-#[derive(uniffi::Record)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(uniffi::Record))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 pub struct ReceivedFrame {
 	/// The request it answers.
+	#[cfg_attr(target_arch = "wasm32", wasm_bindgen(readonly, js_name = requestId))]
 	pub request_id: String,
 	/// Which leg it carries.
+	#[cfg_attr(target_arch = "wasm32", wasm_bindgen(readonly))]
 	pub leg: FrameLeg,
 	/// The decoded payload.
+	#[cfg_attr(target_arch = "wasm32", wasm_bindgen(readonly))]
 	pub outcome: String,
 }
 
+/// Why the stand-in could not build a frame.
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(uniffi::Error))]
+pub enum FrameError {
+	/// The public key given is not 32 bytes.
+	#[error("a public key is 32 bytes")]
+	PublicKeyLength,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl From<FrameError> for JsValue {
+	fn from(error: FrameError) -> Self {
+		JsError::new(&error.to_string()).into()
+	}
+}
+
 fn frame(request_id: String, ids: MethodIds, message_type: u8, value: Vec<u8>) -> Vec<u8> {
-	ProtocolMessage::new(request_id, ids, message_type, value).encode()
+	ProtocolMessage { request_id, ids, message_type, value }.encode()
 }
 
 /// `account.getAccounts()`.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = getAccountsFrame))]
 pub fn get_accounts_frame(request_id: String) -> Vec<u8> {
 	frame(request_id, ACCOUNT_GET_ACCOUNTS, MESSAGE_TYPE_REQUEST, Vec::new())
 }
 
 /// `account.accountsSubscribe()`.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = accountsSubscribeFrame))]
 pub fn accounts_subscribe_frame(request_id: String) -> Vec<u8> {
 	frame(request_id, ACCOUNT_ACCOUNTS_SUBSCRIBE, MESSAGE_TYPE_REQUEST, Vec::new())
 }
 
 /// Stops the account subscription started with `request_id`.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = accountsUnsubscribeFrame))]
 pub fn accounts_unsubscribe_frame(request_id: String) -> Vec<u8> {
 	frame(request_id, ACCOUNT_ACCOUNTS_SUBSCRIBE, MESSAGE_TYPE_STOP, Vec::new())
 }
 
-/// `signing.signRaw({ publicKey, payload })`.
-#[uniffi::export]
-pub fn sign_raw_frame(request_id: String, public_key: Bytes32, payload: Vec<u8>) -> Vec<u8> {
+/// `signing.signRaw({ publicKey, payload })`. Fails when `public_key` is not
+/// 32 bytes.
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = signRawFrame))]
+pub fn sign_raw_frame(
+	request_id: String,
+	public_key: Vec<u8>,
+	payload: Vec<u8>,
+) -> Result<Vec<u8>, FrameError> {
+	let public_key = Bytes32(public_key.try_into().map_err(|_| FrameError::PublicKeyLength)?);
 	let request = HostSignRawRequest { public_key, payload: Bytes(payload) };
-	frame(request_id, SIGNING_SIGN_RAW, MESSAGE_TYPE_REQUEST, request.encode())
+	Ok(frame(request_id, SIGNING_SIGN_RAW, MESSAGE_TYPE_REQUEST, request.encode()))
 }
 
 /// `localStorage.write({ key, value })`.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = storageWriteFrame))]
 pub fn storage_write_frame(request_id: String, key: String, value: Vec<u8>) -> Vec<u8> {
 	let request = HostLocalStorageWriteRequest { key, value: Bytes(value) };
 	frame(request_id, LOCAL_STORAGE_WRITE, MESSAGE_TYPE_REQUEST, request.encode())
 }
 
 /// `localStorage.read({ key })`.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = storageReadFrame))]
 pub fn storage_read_frame(request_id: String, key: String) -> Vec<u8> {
 	let request = HostLocalStorageReadRequest { key };
 	frame(request_id, LOCAL_STORAGE_READ, MESSAGE_TYPE_REQUEST, request.encode())
 }
 
 /// `notifications.pushNotification({ text })`.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = pushNotificationFrame))]
 pub fn push_notification_frame(request_id: String, text: String) -> Vec<u8> {
 	let request = HostPushNotificationRequest { text };
 	frame(request_id, NOTIFICATIONS_PUSH_NOTIFICATION, MESSAGE_TYPE_REQUEST, request.encode())
 }
 
 /// Reads a frame the host sent, as text.
-#[uniffi::export]
+#[cfg_attr(not(target_arch = "wasm32"), uniffi::export)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = describeFrame))]
 pub fn describe_frame(frame: Vec<u8>) -> ReceivedFrame {
 	let message = match ProtocolMessage::decode(&mut frame.as_slice()) {
 		Ok(message) => message,
@@ -118,8 +157,7 @@ pub fn describe_frame(frame: Vec<u8>) -> ReceivedFrame {
 			};
 		},
 	};
-	let Payload { trait_id, method_id, message_type, value } = message.payload;
-	let ids = MethodIds { trait_id, method_id };
+	let ProtocolMessage { request_id, ids, message_type, value } = message;
 	let leg = match message_type {
 		MESSAGE_TYPE_RESPONSE if ids == ACCOUNT_ACCOUNTS_SUBSCRIBE => FrameLeg::Item,
 		MESSAGE_TYPE_RESPONSE => FrameLeg::Response,
@@ -146,9 +184,9 @@ pub fn describe_frame(frame: Vec<u8>) -> ReceivedFrame {
 		(NOTIFICATIONS_PUSH_NOTIFICATION, _) => {
 			describe::<Result<(), CallError<HostPushNotificationError>>>(&value)
 		},
-		_ => format!("unknown method ({trait_id}, {method_id})"),
+		_ => format!("unknown method ({}, {})", ids.trait_id, ids.method_id),
 	};
-	ReceivedFrame { request_id: message.request_id, leg, outcome }
+	ReceivedFrame { request_id, leg, outcome }
 }
 
 fn describe<T: Decode + Debug>(payload: &[u8]) -> String {

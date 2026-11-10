@@ -8,16 +8,13 @@ use syn::LitStr;
 use crate::{TYPESCRIPT_MODULE_DECLARATION, TYPESCRIPT_NAMESPACE};
 
 /// Expands `typescript_module!("<module>")`.
-pub fn expand(input: TokenStream) -> TokenStream {
-	let module = match syn::parse2::<LitStr>(input) {
-		Ok(module) => module,
-		Err(error) => return error.to_compile_error(),
-	};
+pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
+	let module = syn::parse2::<LitStr>(input)?;
 	let declaration = format_ident!("{TYPESCRIPT_MODULE_DECLARATION}");
 	let import = format!("import type * as {TYPESCRIPT_NAMESPACE} from \"{}\";", module.value());
 	// wasm-bindgen consumes the custom section's constant, so the module is
 	// also kept in a plain one that `#[extension_point]` can name.
-	quote! {
+	Ok(quote! {
 		#[cfg(target_arch = "wasm32")]
 		#[::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
 		const _: &str = #import;
@@ -25,5 +22,5 @@ pub fn expand(input: TokenStream) -> TokenStream {
 		/// The TypeScript module every `Js<Trait>` of this crate is typed from.
 		#[cfg(target_arch = "wasm32")]
 		const #declaration: &str = #module;
-	}
+	})
 }

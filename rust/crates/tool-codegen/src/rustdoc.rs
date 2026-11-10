@@ -42,7 +42,6 @@ pub struct ItemPath {
 	crate_id: u32,
 	/// Full path, starting with the crate name.
 	pub path: Vec<String>,
-	kind: String,
 }
 
 /// Parses rustdoc JSON, rejecting a format older than the walkers know.
@@ -114,22 +113,6 @@ impl Crate {
 		Ok(())
 	}
 
-	/// Local items of `kind` whose path runs through module `module`, with
-	/// their ids.
-	pub fn items_in_module(&self, module: &str, kind: &str) -> Vec<(&str, &Item)> {
-		let mut found: Vec<_> =
-			self.paths
-				.iter()
-				.filter(|(_, path)| {
-					path.crate_id == 0 &&
-						path.kind == kind && path.path.get(1).map(String::as_str) == Some(module)
-				})
-				.filter_map(|(id, _)| self.index.get(id).map(|item| (id.as_str(), item)))
-				.collect();
-		found.sort_by_key(|(_, item)| item.name.clone());
-		found
-	}
-
 	/// The items of a trait, in declaration order.
 	pub fn trait_items(&self, item: &Item) -> Result<Vec<&Item>> {
 		item.inner
@@ -185,8 +168,7 @@ impl<'a> World<'a> {
 			if self.type_ref(krate, element)? != TypeRef::U8 {
 				bail!("only byte arrays are supported");
 			}
-			let len = array.get("len").and_then(Value::as_str).context("array has no length")?;
-			return Ok(TypeRef::FixedBytes(len.parse().context("array length is not a number")?));
+			return Ok(TypeRef::Bytes);
 		}
 		if ty.get("borrowed_ref").is_some() {
 			bail!("arguments and fields must be owned");
@@ -234,25 +216,25 @@ impl<'a> World<'a> {
 	/// The crate that defines the item `krate` calls `id`, and its id there.
 	fn definition(&self, krate: &Crate, id: &str) -> Result<(&'a Crate, &'a str)> {
 		let path = krate.paths.get(id).with_context(|| format!("item {id} has no path"))?;
-		let crate_name = path.path.first().context("empty path")?;
+		self.locate(&path.path)
+	}
+
+	/// The crate that defines the item at `path`, and its id there.
+	fn locate(&self, path: &[String]) -> Result<(&'a Crate, &'a str)> {
+		let crate_name = path.first().context("empty path")?;
 		for candidate in &self.crates {
 			if candidate.name()? == crate_name &&
-				let Some(found) = candidate.id_of_path(&path.path)
+				let Some(found) = candidate.id_of_path(path)
 			{
 				return Ok((candidate, found));
 			}
 		}
-		bail!("{} is defined in a crate tool-codegen did not load", path.path.join("::"))
+		bail!("{} is defined in a crate tool-codegen did not load", path.join("::"))
 	}
 
 	/// The definition of `name`.
 	pub fn type_def(&self, name: &TypeName) -> Result<TypeDef> {
-		let krate = self
-			.crates
-			.iter()
-			.find(|krate| krate.name().is_ok_and(|crate_name| crate_name == name.crate_name()))
-			.with_context(|| format!("{name} is defined in a crate tool-codegen did not load"))?;
-		let id = krate.id_of_path(&name.path).with_context(|| format!("{name} is missing"))?;
+		let (krate, id) = self.locate(&name.path)?;
 		let item = krate.item(id)?;
 		let kind = if let Some(body) = item.inner.get("struct") {
 			let field_ids = body
@@ -344,11 +326,9 @@ pub fn clean_docs(docs: Option<&str>) -> Option<String> {
 	(!cleaned.is_empty()).then_some(cleaned)
 }
 
-/// The value of codegen tag `@{tag}=N` in `docs`.
-pub fn tag_value(docs: Option<&str>, tag: &str) -> Option<u8> {
-	docs?
-		.lines()
-		.find_map(|line| line.trim().strip_prefix(&format!("@{tag}="))?.parse().ok())
+/// Whether `docs` carry the codegen tag `@{tag}`.
+pub fn has_tag(docs: Option<&str>, tag: &str) -> bool {
+	docs.is_some_and(|docs| docs.lines().any(|line| line.trim() == format!("@{tag}")))
 }
 
 /// The string form of a rustdoc id, which is a number in item bodies and a

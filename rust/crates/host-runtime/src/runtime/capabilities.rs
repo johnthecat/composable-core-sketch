@@ -52,9 +52,11 @@ impl Account for ProductRuntimeHost {
 		let mut last = None;
 		Subscription::new(stream::once(future::ready(current)).chain(changes).filter_map(
 			move |accounts| {
-				let changed = last.as_ref() != Some(&accounts);
+				if last.as_ref() == Some(&accounts) {
+					return future::ready(None);
+				}
 				last = Some(accounts.clone());
-				future::ready(changed.then_some(Ok(HostAccountAccountsSubscribeItem { accounts })))
+				future::ready(Some(Ok(HostAccountAccountsSubscribeItem { accounts })))
 			},
 		))
 	}

@@ -2,10 +2,10 @@
 // point itself, with no Rust provider. Keys and signatures are SHA-2 hashes
 // standing in for real ones, not cryptographic keys or signatures.
 
-import type { ProductAccount } from "@sketch/protocol-client";
 import {
   WalletException,
   type AccountsListener,
+  type ProductAccount,
   type SignRequest,
   type Signature,
   type Wallet,

@@ -549,7 +549,7 @@ dependencies = [
  "host-provider-notifier-log",
  "host-provider-wallet-mock",
  "host-runtime",
- "product-native",
+ "product-stand-in",
  "uniffi",
 ]
 
@@ -560,6 +560,7 @@ dependencies = [
  "host-provider-notifier-log",
  "host-provider-wallet-mock",
  "host-runtime",
+ "product-stand-in",
  "wasm-bindgen",
 ]
 
@@ -861,12 +862,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "product-native"
+name = "product-stand-in"
 version = "0.1.0"
 dependencies = [
  "parity-scale-codec",
  "protocol",
+ "thiserror",
  "uniffi",
+ "wasm-bindgen",
 ]
 
 [[package]]

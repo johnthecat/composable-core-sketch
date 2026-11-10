@@ -36,9 +36,6 @@ pub enum Shape<'a> {
 		ok: &'a Type,
 		/// The trait's error, `<Trait>Error`.
 		error: &'a Type,
-		/// The name a declared `error` rejects with on the web:
-		/// `<Trait>Exception`.
-		exception: String,
 	},
 	/// `fn …` returning nothing, which returns at once: handing over a
 	/// listener, or a listener's own method.
@@ -131,6 +128,8 @@ impl Param<'_> {
 /// - `Wasm<Trait>`.
 pub fn web_glue(name: &Ident, methods: &[Method]) -> TokenStream {
 	let js_type = format_ident!("Js{name}");
+	// The name a declared error rejects with on the web.
+	let exception = format!("{name}Exception");
 	let module_declaration = format_ident!("{TYPESCRIPT_MODULE_DECLARATION}");
 	let foreign = format_ident!("Foreign{name}");
 	let wasm = format_ident!("Wasm{name}");
@@ -151,7 +150,7 @@ pub fn web_glue(name: &Ident, methods: &[Method]) -> TokenStream {
 		let Method { name, js_name, params, shape, .. } = method;
 		let param_list = params.iter().map(|Param { name, ty, .. }| quote!(#name: #ty));
 		match shape {
-			Shape::Call { ok, error, exception } => {
+			Shape::Call { ok, error } => {
 				let error = quote!(#error);
 				let args = params.iter().map(|param| param.encode_expression(&error));
 				quote! {
@@ -180,7 +179,7 @@ pub fn web_glue(name: &Ident, methods: &[Method]) -> TokenStream {
 			params.iter().map(|Param { name, .. }| quote!(#name: ::wasm_bindgen::JsValue));
 		let args = params.iter().map(|Param { name, .. }| name);
 		match shape {
-			Shape::Call { ok, error, exception } => {
+			Shape::Call { ok, error } => {
 				let decode_params =
 					params.iter().map(|param| param.decode_statement(&quote!(<#error>::from)));
 				quote! {

@@ -3,6 +3,7 @@
 The web host app's own crate. It links the core and the providers the app uses into the app's one WASM binary, and
 declares the runtime constructor once, as [host-app-native](../../host-app-native/README.md) does. The binary also
 carries the providers' exports (`MockPhone`, `logNotifier`), each handing its provider to TypeScript as a typed object.
+It also carries the frame builders of [product-stand-in](../../product-stand-in/README.md).
 Why the two host crates read the same: see "One host crate per host" in
 [docs/departures-from-the-rfc.md](../../../docs/departures-from-the-rfc.md).
 

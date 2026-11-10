@@ -28,6 +28,7 @@ wasm-opt = [
 host-provider-notifier-log.workspace = true
 host-provider-wallet-mock.workspace = true
 host-runtime.workspace = true
+product-stand-in.workspace = true
 wasm-bindgen.workspace = true
 
 [lints]

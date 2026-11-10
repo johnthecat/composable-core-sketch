@@ -12,9 +12,10 @@ use host_runtime::{
 	HostExtensions, HostRuntime,
 	host::extension::{confirmation, notifier, storage, wallet},
 };
-// Links the providers' exports into the binary.
+// Links the providers' exports, and the stand-in product's, into the binary.
 use host_provider_notifier_log as _;
 use host_provider_wallet_mock as _;
+use product_stand_in as _;
 
 /// Build the host runtime over the extension points the app passes in: its
 /// own storage and confirmation, and the providers or its code around them.

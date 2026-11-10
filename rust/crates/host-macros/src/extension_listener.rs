@@ -8,26 +8,17 @@ use syn::{ItemTrait, ReturnType, TraitItem};
 use crate::web_glue::{Method, Shape, web_glue};
 
 /// Expands `#[extension_listener]` on `item`, which takes no arguments.
-pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
-	if !args.is_empty() {
-		return syn::Error::new_spanned(args, "#[extension_listener] takes no arguments")
-			.to_compile_error();
-	}
-	let item = match syn::parse2::<ItemTrait>(item) {
-		Ok(item) => item,
-		Err(error) => return error.to_compile_error(),
-	};
-	let methods = match item.items.iter().map(method).collect::<syn::Result<Vec<_>>>() {
-		Ok(methods) => methods,
-		Err(error) => return error.to_compile_error(),
-	};
+pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+	crate::no_arguments(&args, "extension_listener")?;
+	let item = syn::parse2::<ItemTrait>(item)?;
+	let methods = item.items.iter().map(method).collect::<syn::Result<Vec<_>>>()?;
 	let glue = web_glue(&item.ident, &methods);
-	quote! {
+	Ok(quote! {
 		#[cfg_attr(not(target_arch = "wasm32"), ::uniffi::export(rust, foreign))]
 		#item
 
 		#glue
-	}
+	})
 }
 
 /// A notification: `fn(&self, owned values)` returning nothing.

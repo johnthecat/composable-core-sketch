@@ -15,24 +15,16 @@ use crate::type_path::{dyn_trait_path, glue_path, single_argument};
 
 /// Expands `#[constructor]` on a host crate's constructor function; it takes
 /// no arguments.
-pub fn expand(args: TokenStream, item: TokenStream) -> TokenStream {
-	if !args.is_empty() {
-		return syn::Error::new_spanned(args, "#[constructor] takes no arguments")
-			.to_compile_error();
-	}
-	let function = match syn::parse2::<ItemFn>(item) {
-		Ok(function) => function,
-		Err(error) => return error.to_compile_error(),
-	};
-	match web_export(&function) {
-		Ok(web) => quote! {
-			#[cfg_attr(not(target_arch = "wasm32"), ::uniffi::export)]
-			#function
+pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+	crate::no_arguments(&args, "constructor")?;
+	let function = syn::parse2::<ItemFn>(item)?;
+	let web = web_export(&function)?;
+	Ok(quote! {
+		#[cfg_attr(not(target_arch = "wasm32"), ::uniffi::export)]
+		#function
 
-			#web
-		},
-		Err(error) => error.to_compile_error(),
-	}
+		#web
+	})
 }
 
 /// The wasm-bindgen function that wraps each JS object in its `Foreign<Trait>`
@@ -64,25 +56,17 @@ fn web_export(function: &ItemFn) -> syn::Result<TokenStream> {
 		};
 		let js_type = glue_path(&trait_name, "Js");
 		let foreign = glue_path(&trait_name, "Foreign");
+		let wrap = quote! {
+			|object| #foreign::new(object)
+				.map(|foreign| ::std::sync::Arc::new(foreign) as ::std::sync::Arc<dyn #trait_name>)
+				.map_err(|reason| ::wasm_bindgen::JsError::new(&reason))
+		};
 		if optional {
 			params.push(quote!(#param: ::core::option::Option<#js_type>));
-			args.push(quote! {
-				#param
-					.map(#foreign::new)
-					.transpose()
-					.map_err(|reason| ::wasm_bindgen::JsError::new(&reason))?
-					.map(|foreign| {
-						::std::sync::Arc::new(foreign) as ::std::sync::Arc<dyn #trait_name>
-					})
-			});
+			args.push(quote!(#param.map(#wrap).transpose()?));
 		} else {
 			params.push(quote!(#param: #js_type));
-			args.push(quote! {
-				::std::sync::Arc::new(
-					#foreign::new(#param)
-						.map_err(|reason| ::wasm_bindgen::JsError::new(&reason))?,
-				)
-			});
+			args.push(quote!((#wrap)(#param)?));
 		}
 	}
 	let doc = format!("[`{name}`] for web hosts, each extension point a typed JS object.");

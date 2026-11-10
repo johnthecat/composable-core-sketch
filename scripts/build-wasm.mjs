@@ -2,7 +2,7 @@
 // Builds the web host app's one WASM binary from its host crate,
 // `apps/host-app-web/host-app-web-wasm`, with `wasm-pack build --target web`:
 // the core and both providers in one binary, written to
-// `apps/host-app-web/wasm/`.
+// `apps/host-app-web/wasm/`. It also holds the stand-in product.
 //
 // The check after the build holds the generated `.d.ts` to the shape the app's
 // `tsc` relies on: it imports the interface crate's TypeScript module exactly
