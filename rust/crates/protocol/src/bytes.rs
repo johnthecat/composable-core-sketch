@@ -1,6 +1,7 @@
-//! Byte values that say how they cross each boundary themselves: SCALE encodes
-//! each as its contents, UniFFI lowers each as bytes (`Data` in Swift,
-//! `ByteArray` in Kotlin), and serde, on the web, serializes each with
+//! Byte values that say how they cross each boundary themselves.
+//!
+//! SCALE encodes each as its contents. UniFFI lowers each as bytes (`Data` in
+//! Swift, `ByteArray` in Kotlin). On the web, serde serializes each with
 //! `serialize_bytes`, which `serde-wasm-bindgen` turns into a `Uint8Array`.
 
 use parity_scale_codec::{Decode, Encode};

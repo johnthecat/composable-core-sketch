@@ -125,7 +125,11 @@ fn request(method: &TraitItemFn) -> syn::Result<Request> {
 	}
 }
 
-/// `Result` or `Subscription`, its value type, and its `CallError`'s domain type.
+/// The output of `method`, in parts:
+///
+/// - `Result` or `Subscription`;
+/// - its value type;
+/// - its `CallError`'s domain type.
 fn output_types(method: &TraitItemFn) -> syn::Result<(String, &Type, &Type)> {
 	let error = || {
 		syn::Error::new_spanned(

@@ -1,9 +1,7 @@
 //! A [`Notifier`](host_extension::notifier::Notifier) provider that writes each notice to the
-//! log, the provider crate of the RFC's example.
+//! log.
 //!
-//! The crate depends on the interface crate only. `src/notifier.rs` implements
-//! the trait; `src/wasm.rs` hands the provider to JS as a typed `Notifier`
-//! object, and `src/native.rs` returns it as a trait object for UniFFI.
+//! `README.md` describes its exports and its place in the demo.
 
 #[cfg(not(target_arch = "wasm32"))]
 uniffi::setup_scaffolding!();

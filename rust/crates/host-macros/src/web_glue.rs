@@ -1,6 +1,8 @@
-//! The web glue `#[extension_point]` and `#[extension_listener]` write: the
-//! trait's JS object type, the trait over such an object, and a Rust
-//! implementation handed to JS.
+//! The web glue `#[extension_point]` and `#[extension_listener]` write:
+//!
+//! - the trait's JS object type;
+//! - the trait over such an object;
+//! - a Rust implementation handed to JS.
 
 use heck::ToLowerCamelCase;
 use proc_macro2::TokenStream;
@@ -122,8 +124,11 @@ impl Param<'_> {
 	}
 }
 
-/// The web glue of the trait `name`: `Js<Trait>`, `Foreign<Trait>` and
-/// `Wasm<Trait>`, all compiled for `wasm32` only.
+/// The web glue of the trait `name`, all compiled for `wasm32` only:
+///
+/// - `Js<Trait>`;
+/// - `Foreign<Trait>`;
+/// - `Wasm<Trait>`.
 pub fn web_glue(name: &Ident, methods: &[Method]) -> TokenStream {
 	let js_type = format_ident!("Js{name}");
 	let module_declaration = format_ident!("{TYPESCRIPT_MODULE_DECLARATION}");

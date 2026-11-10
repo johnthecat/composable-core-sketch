@@ -1,6 +1,6 @@
 //! The calls in flight on one product connection: requests awaiting their
 //! response, and running subscriptions. Each runs on the spawner until it
-//! finishes, the product stops it, or the connection is dropped.
+//! finishes or the product stops it. Dropping the connection ends it too.
 
 use std::{
 	collections::HashMap,

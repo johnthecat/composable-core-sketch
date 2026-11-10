@@ -39,8 +39,8 @@ pub enum HostSignRawError {
 #[async_trait::async_trait]
 pub trait Signing: Send + Sync {
 	/// This call exists because it crosses two extension points in turn,
-	/// `UserConfirmation` and then `Wallet`, so a host sees a call wait on the
-	/// user, fail in a provider, or be dropped while it waits.
+	/// `UserConfirmation` and then `Wallet`. A host sees the call wait on the
+	/// user or fail in a provider, and the core can drop it while it waits.
 	///
 	/// Sign raw bytes. The user confirms each call; a refusal fails it as
 	/// `Denied`.

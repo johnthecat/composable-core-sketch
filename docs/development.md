@@ -2,11 +2,16 @@
 
 ## Prerequisites
 
-Rust stable with the `wasm32-unknown-unknown` target; the dated nightly in `nightly-toolchain` with rustfmt;
-`wasm-pack`; Node 20 or newer; bun, on `PATH` or from the root `devDependencies`. For the native apps: Xcode's
-command line tools (Swift 5.9 or newer), and a JDK 21 or newer on `PATH` or in `JAVA_HOME`; the Kotlin app's Gradle
-wrapper fetches Gradle itself. Make is the only command layer; the npm packages declare no scripts.
-`NIGHTLY_TOOLCHAIN` overrides the nightly in `nightly-toolchain`, for the Makefile and the scripts it runs.
+- Rust stable with the `wasm32-unknown-unknown` target;
+- the dated nightly in `nightly-toolchain` with rustfmt;
+- `wasm-pack`;
+- Node 20 or newer;
+- bun, on `PATH` or from the root `devDependencies`.
+
+For the native apps: Xcode's command line tools (Swift 5.9 or newer), and a JDK 21 or newer on `PATH` or in
+`JAVA_HOME`; the Kotlin app's Gradle wrapper fetches Gradle itself. Make is the only command layer; the npm packages
+declare no scripts. `NIGHTLY_TOOLCHAIN` overrides the nightly in `nightly-toolchain`, for the Makefile and the
+scripts it runs.
 
 ## Pipeline
 
@@ -33,31 +38,8 @@ Nothing `make codegen` writes is committed. The native apps need no codegen: the
 
 ## Tests
 
-- `tool-codegen`: a snapshot of `extensions.ts` for the RFC's `Notifier` and a listener naming a protocol type
-  (`src/ts/extensions/tests/*.snap`; rewrite with `SKETCH_CODEGEN_WRITE_SNAPSHOTS=1`), and unit tests of the rustdoc
-  reader (async methods, wire tags, newtypes, public modules) and the TS type emission.
-- `protocol`: the frame layout, which matches the bytes the TS client's test checks.
-- `host-runtime`: the core driven by frames. A confirmed signature reaches the wallet with the product's payload; a
-  refused confirmation is `Denied` before the wallet signs; an unknown account fails before the user is asked; no
-  wallet is `Unsupported`; a notifier refusal reaches the product; dropping the product runtime drops a call still in
-  flight; a subscription sends the current list and each pushed change, and nothing after it stops.
-- `host-extension`: an undeclared failure becomes `Unknown`, and a declared one keeps its message. Under Node, each
-  byte type round-trips through the web glue's conversion as a `Uint8Array`, a value that does not convert is an
-  error, and only a rejection named for the trait is declared.
-- `host-provider-notifier-log`: a notice becomes one log line, and an empty one is refused.
-- `host-provider-wallet-mock`: the phone answers each request as it was last told, and never answers when
-  unreachable; a signature binds the payload to the account; signing with an account it does not hold fails; an added
-  account is pushed to the last listener given.
-- `@sketch/host-extension`: a rejection from the WASM glue is accepted by its generated exception class.
-- `@sketch/protocol-client`: the frame bytes, and the generated client over a loopback transport.
-- `apps/host-app-web/src/composition.test.ts`: the glue, through the app's real WASM binary with the product's generated
-  client on the far end of a `MessageChannel`: a signature through the tracking wallet, a declined request, the
-  TypeScript wallet, the notifier wrapper, an account pushed through the tracking wallet and through the TypeScript
-  wallet, a stopped subscription that receives no frame, storage scoped to each product, and an extension point
-  object missing a method.
-- The Swift and Kotlin apps check two things as they run, and exit with a failure if either fails: that the product
-  received the current account list and then the pushed change, and that a stopped subscription receives no item
-  when another account is added.
+Each package README says what its tests prove. The stop checks run in the web host app's composition test and in
+both native apps.
 
 The stop checks wait on no timer. The host serves a product's frames in order, so the answer to a call made after
 the stop proves the stop was served (natively, `receive_frame` serves it before it returns). An item for a later push

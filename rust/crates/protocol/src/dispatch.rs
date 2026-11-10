@@ -1,6 +1,6 @@
 //! The method table a dispatcher serves: each protocol method's wire pair and
-//! a handler that decodes its request, calls the trait, and encodes what it
-//! returns.
+//! a handler that decodes its request and calls the trait. The handler encodes
+//! what the trait returns.
 //!
 //! `#[wire_trait]` writes one table per trait (`signing::methods`, ...) from the
 //! trait's own signatures, and [`crate::api::methods`] joins them. The host

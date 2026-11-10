@@ -1,12 +1,8 @@
 //! The web host app's own crate: it links the core and the providers the app
 //! uses into the app's one WASM binary, and declares the runtime constructor
-//! once, as the native host crate does. It builds for `wasm32` only.
+//! once. It builds for `wasm32` only.
 //!
-//! The binary also carries the providers' exports (`MockPhone`,
-//! `logNotifier`), each handing its provider to TypeScript as a typed object.
-//!
-//! Why it reads the same as the native host crate: see "One host crate per host" in
-//! `docs/departures-from-the-rfc.md`.
+//! `README.md` describes its role in the demo.
 
 #![cfg(target_arch = "wasm32")]
 

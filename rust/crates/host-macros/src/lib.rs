@@ -58,12 +58,12 @@ pub fn wire(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// Next to the trait it writes a `<TRAIT>_<METHOD>` wire pair constant per
-/// method and a `methods` function: the method table a dispatcher serves,
-/// decoding each request, calling the trait and encoding the result. So a
-/// module holds one service. Each method must carry `#[wire(id = N)]`, take
-/// `&self` and at most one request, and return `Result<_, CallError<_>>` or
-/// `Subscription<_, CallError<_>>`. A method without a request takes an empty
-/// payload.
+/// method and a `methods` function: the method table a dispatcher serves. The
+/// table decodes each request and calls the trait, then encodes the result. So
+/// a module holds one service. Each method must carry `#[wire(id = N)]`, and
+/// take `&self` and at most one request. It must return
+/// `Result<_, CallError<_>>` or `Subscription<_, CallError<_>>`. A method
+/// without a request takes an empty payload.
 #[proc_macro_attribute]
 pub fn wire_trait(args: TokenStream, item: TokenStream) -> TokenStream {
 	wire::expand_trait(args, item)
@@ -88,19 +88,22 @@ pub fn protocol_record(args: TokenStream, item: TokenStream) -> TokenStream {
 /// - a notification handing over a listener, `fn set_<value>_listener(&self, listener: Arc<dyn
 ///   L>)`, where `L` is an [`macro@extension_listener`].
 ///
-/// Values never hold `Vec<u8>` or `[u8; N]`; bytes are the protocol's `Bytes`, `Bytes32` or
-/// `Bytes64`. The crate names the TypeScript module of its interfaces once, with
+/// Values never hold `Vec<u8>` or `[u8; N]`; the protocol's `Bytes`, `Bytes32` or `Bytes64` holds
+/// bytes. The crate names the TypeScript module of its interfaces once, with
 /// [`typescript_module!`]; without it the crate fails to build for `wasm32`, naming the missing
 /// `HOST_EXTENSION_TYPESCRIPT_MODULE`. The attribute adds:
 ///
 /// - `uniffi::export(rust, foreign)` on native targets, so Swift and Kotlin can implement the trait
 ///   and call a Rust implementation;
 /// - `async_trait`;
-/// - on `wasm32`: `Js<Trait>`, the JS object type, typed as `HostExtension.<Trait>` in the
-///   generated `.d.ts`; `Foreign<Trait>`, which implements the trait over such an object for the
-///   core and refuses an object missing a method; and `Wasm<Trait>::into_js`, which hands a Rust
-///   implementation to JS as one. Values cross as typed JS values. A declared error crosses as an
-///   `Error` named `<Trait>Exception` whose `error` property holds it.
+/// - on `wasm32`:
+///   - `Js<Trait>`, the JS object type, typed as `HostExtension.<Trait>` in the generated `.d.ts`;
+///   - `Foreign<Trait>`, which implements the trait over such an object for the core and refuses an
+///     object missing a method;
+///   - `Wasm<Trait>::into_js`, which hands a Rust implementation to JS as one.
+///
+///   Values cross as typed JS values. A declared error crosses as an `Error` named
+///   `<Trait>Exception` whose `error` property holds it.
 #[proc_macro_attribute]
 pub fn extension_point(args: TokenStream, item: TokenStream) -> TokenStream {
 	extension_point::expand(args.into(), item.into()).into()
@@ -120,11 +123,14 @@ pub fn extension_listener(args: TokenStream, item: TokenStream) -> TokenStream {
 	extension_listener::expand(args.into(), item.into()).into()
 }
 
-/// Declare an extension point's error, named `<Trait>Error`. Write only the
-/// failures the trait declares; the attribute adds the `Unknown { reason }`
-/// variant for every other failure, `From<String>` and, natively,
-/// `From<uniffi::UnexpectedUniFFICallbackError>` into it, and the derives an
-/// error needs on each platform, `Debug` and `thiserror::Error` included.
+/// Declare an extension point's error, named `<Trait>Error`.
+///
+/// Write only the failures the trait declares. The attribute adds:
+///
+/// - the `Unknown { reason }` variant for every other failure;
+/// - `From<String>` and, natively, `From<uniffi::UnexpectedUniFFICallbackError>` into it;
+/// - the derives an error needs on each platform, `Debug` and `thiserror::Error` included.
+///
 /// Each declared variant carries its own `#[error("…")]` message.
 #[proc_macro_attribute]
 pub fn extension_error(args: TokenStream, item: TokenStream) -> TokenStream {

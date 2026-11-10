@@ -9,8 +9,11 @@
 #                                 (one package per crate)
 #
 # Library mode reads the UniFFI metadata of every crate the library links, so
-# one run covers the core, the interface crate, the protocol and both
-# providers.
+# one run covers:
+#   - the core;
+#   - the interface crate;
+#   - the protocol;
+#   - both providers.
 
 set -euo pipefail
 

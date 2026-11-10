@@ -11,12 +11,20 @@
 //! | 8 | `Notifications` |
 //! | 13 | `Signing` |
 //!
-//! `services!` names each service once: its module, its trait, its place in
-//! [`methods`] and in [`ProductApi`].
+//! `services!` names each service once:
+//!
+//! - its module;
+//! - its trait;
+//! - its place in [`methods`] and in [`ProductApi`].
 
-/// Declares every service from one list of `module::Trait`: the modules, the
-/// traits re-exported here, [`methods`] joining their method tables, and
-/// [`ProductApi`] requiring them all.
+/// Declares every service from one list of `module::Trait`.
+///
+/// It declares:
+///
+/// - the modules;
+/// - the traits re-exported here;
+/// - [`methods`] joining their method tables;
+/// - [`ProductApi`] requiring them all.
 macro_rules! services {
 	($($module:ident :: $service:ident),+ $(,)?) => {
 		$(

@@ -1,5 +1,7 @@
-// The byte-level transport the generated client calls: wire frames, request
-// correlation, and subscriptions as observables.
+// The byte-level transport the generated client calls:
+// - wire frames;
+// - request correlation;
+// - subscriptions as observables.
 
 import { ResultAsync, err, ok, type Result } from "neverthrow";
 import { Result as ResultCodec, _void, str, type Codec } from "scale-ts";

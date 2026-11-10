@@ -1,9 +1,13 @@
 //! What the web glue `#[extension_point]` writes is built on: calling a JS
 //! object's async method, and handing a Rust future to JS as a promise.
 //!
-//! Values cross as typed JS values through serde: records with camelCase
-//! fields, enums as `{ tag, value }`, and the protocol's byte types as
-//! `Uint8Array`. A value that does not convert fails the call with the error's
+//! Values cross as typed JS values through serde:
+//!
+//! - records with camelCase fields;
+//! - enums as `{ tag, value }`;
+//! - the protocol's byte types as `Uint8Array`.
+//!
+//! A value that does not convert fails the call with the error's
 //! `Unknown` variant. A declared error crosses as an `Error` named
 //! `<Trait>Exception` whose `error` property holds it; any other rejection is a
 //! failure the trait does not declare, and becomes the error's `From<String>`.

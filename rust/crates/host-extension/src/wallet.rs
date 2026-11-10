@@ -1,5 +1,6 @@
-//! The `Wallet` extension point: the accounts the core signs with, held by the
-//! host, by this device, or by a paired phone.
+//! The `Wallet` extension point: the accounts the core signs with.
+//!
+//! The host, this device or a paired phone holds them.
 
 use std::sync::Arc;
 

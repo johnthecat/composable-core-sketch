@@ -21,7 +21,7 @@ help: ## Show this help.
 	@awk 'BEGIN { FS = ":.*##"; printf "Usage: make <target>\n\nTargets:\n" } \
 	      /^[a-zA-Z0-9_-]+:.*?##/ { printf "  %-12s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-setup: ## Install the JS dependencies, the pinned nightly and the wasm32 target.
+setup: ## Install the JS dependencies. Add the pinned nightly and the wasm32 target.
 	npm install
 	rustup toolchain install "$(NIGHTLY_TOOLCHAIN)" --component rustfmt
 	rustup target add wasm32-unknown-unknown
@@ -32,7 +32,7 @@ codegen: ## Generate the product client and the extension point interfaces (Type
 wasm: ## Build the web host app's WASM binary: the core and the providers it links.
 	node scripts/build-wasm.mjs
 
-packages: codegen ## Build @sketch/protocol-client, @sketch/host-extension and @sketch/host.
+packages: codegen ## Build the TypeScript packages under js/packages.
 	cd $(CLIENT_PKG) && $(BIN)/tsc -b
 	cd $(EXTENSION_PKG) && $(BIN)/tsc -b
 	cd $(HOST_PKG) && $(BIN)/tsc -b
@@ -87,11 +87,11 @@ test: packages wasm ## Rust tests (natively, and the web glue's under Node), the
 
 check: codegen fmt-check clippy typecheck test ## Everything CI would run.
 
-swift: ## Build the host library, generate Swift bindings, run the Swift app.
+swift: ## Build the host library and generate Swift bindings. Then run the Swift app.
 	./scripts/native-bindings.sh swift
 	cd apps/host-app-swift && swift run HostAppSwift
 
-kotlin: ## Build the host library, generate Kotlin bindings, run the Kotlin app.
+kotlin: ## Build the host library and generate Kotlin bindings. Then run the Kotlin app.
 	./scripts/native-bindings.sh kotlin
 	cd apps/host-app-kotlin && ./gradlew --console=plain -q run
 

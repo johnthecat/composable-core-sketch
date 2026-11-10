@@ -1,6 +1,8 @@
-//! The product client, `@sketch/protocol-client`: `types.ts` with every protocol type
-//! and its codec, `wire-table.ts` with each method's wire pair, and
-//! `client.ts` with one class per service over the byte-level transport.
+//! The product client, `@sketch/protocol-client`:
+//!
+//! - `types.ts` with every protocol type and its codec;
+//! - `wire-table.ts` with each method's wire pair;
+//! - `client.ts` with one class per service over the byte-level transport.
 
 use std::fmt::Write;
 

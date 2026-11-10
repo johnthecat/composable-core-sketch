@@ -32,7 +32,9 @@ function report(method: string, outcome: string, detail = ""): void {
   results.prepend(item);
 }
 
-/** `Domain:Rejected`, `Denied`, `Unsupported`, ... */
+/**
+ * The error's outcome, such as `Domain:Rejected` or `Denied`.
+ */
 function describeError(error: CallErrorValue<unknown>): [string, string] {
   if (error.tag !== "Domain") {
     const reason =

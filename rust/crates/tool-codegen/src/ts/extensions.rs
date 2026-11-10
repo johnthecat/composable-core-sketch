@@ -1,10 +1,17 @@
-//! `extensions.ts` in `@sketch/host-extension`: the TypeScript interface of each
-//! extension point, the types it names, and one exception class per declared
-//! error.
+//! `extensions.ts` in `@sketch/host-extension`:
+//!
+//! - the TypeScript interface of each extension point;
+//! - the types it names;
+//! - one exception class per declared error.
 //!
 //! The types are the shapes the web glue of `#[extension_point]` converts
-//! Rust values to and from: camelCase fields, bytes as `Uint8Array`, enums as
-//! `{ tag, value }`. Types from the protocol come from `@sketch/protocol-client`.
+//! Rust values to and from:
+//!
+//! - camelCase fields;
+//! - bytes as `Uint8Array`;
+//! - enums as `{ tag, value }`.
+//!
+//! Types from the protocol come from `@sketch/protocol-client`.
 //! A call returns a `Promise`; a notification, such as a listener's, returns
 //! `void` at once.
 

@@ -1,7 +1,7 @@
 // The Kotlin host app on the JVM. `make kotlin` builds the host library from
-// `apps/host-app-native`, generates its UniFFI bindings into
-// `build/generated/uniffi`, and runs the app, which loads the library through
-// JNA.
+// `apps/host-app-native` and generates its UniFFI bindings into
+// `build/generated/uniffi`. It then runs the app, which loads the library
+// through JNA.
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 

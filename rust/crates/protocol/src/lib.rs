@@ -1,11 +1,11 @@
 //! The product protocol: the API a host serves to products, and the payloads
 //! its methods carry.
 //!
-//! [`api`] declares one trait per service, each method tagged with its wire id,
-//! next to the request, response and error types it carries. `#[wire_trait]`
-//! writes each trait's method table ([`dispatch`]), which the host runtime
-//! serves; `tool-codegen` reads this crate's rustdoc JSON to generate the
-//! TypeScript product client.
+//! [`api`] declares one trait per service, each method tagged with its wire id.
+//! The request, response and error types a trait carries sit next to it.
+//! `#[wire_trait]` writes each trait's method table ([`dispatch`]), which the
+//! host runtime serves; `tool-codegen` reads this crate's rustdoc JSON to
+//! generate the TypeScript product client.
 //!
 //! This crate holds no runtime, so an interface crate may name its types in
 //! extension point signatures without depending on the core.

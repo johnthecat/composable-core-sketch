@@ -1,9 +1,13 @@
 //! Routes product frames to the methods that serve them.
 //!
-//! A [`Dispatcher`] holds the protocol's method table (`protocol::api::methods`,
-//! written by `#[wire_trait]`), keyed on each method's `(trait, method)` wire
-//! pair, the host that serves it, and the product's frame sink. Every call runs
-//! under [`LiveCalls`]. A frame no method serves is dropped.
+//! A [`Dispatcher`] holds:
+//!
+//! - the protocol's method table (`protocol::api::methods`, written by `#[wire_trait]`), keyed on
+//!   each method's `(trait, method)` wire pair;
+//! - the host that serves it;
+//! - the product's frame sink.
+//!
+//! Every call runs under [`LiveCalls`]. A frame no method serves is dropped.
 
 use std::{collections::HashMap, sync::Arc};
 

@@ -1,7 +1,7 @@
 // swift-tools-version:5.9
 // The Swift host app. `make swift` builds the host library from
-// `apps/host-app-native`, generates its UniFFI bindings into
-// `Sources/HostAppNative` and `Sources/HostAppNativeFFI`, and runs the app.
+// `apps/host-app-native` and generates its UniFFI bindings into
+// `Sources/HostAppNative` and `Sources/HostAppNativeFFI`. It then runs the app.
 
 import Foundation
 import PackageDescription

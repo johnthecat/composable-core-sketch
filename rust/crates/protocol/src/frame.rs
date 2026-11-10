@@ -29,7 +29,11 @@ pub const MESSAGE_TYPE_STOP: u8 = 3;
 pub struct ProtocolMessage {
 	/// Correlates a request with its response, and a subscription's frames.
 	pub request_id: String,
-	/// Address, leg and payload.
+	/// The rest of the frame:
+	///
+	/// - its address;
+	/// - its leg;
+	/// - its payload.
 	pub payload: Payload,
 }
 

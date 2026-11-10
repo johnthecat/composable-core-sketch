@@ -1,14 +1,7 @@
-//! A native host's own crate, as the RFC's "iOS and Android hosts" section
-//! describes: it links the core and the providers the host uses into one
-//! library, and declares the runtime constructor once.
+//! A native host's own crate: it links the core and the providers the host
+//! uses into one library, and declares the runtime constructor once.
 //!
-//! Built as a static library for the Swift app and a dynamic one for the
-//! Kotlin app. Each crate it links keeps its own UniFFI namespace, so the
-//! library also carries the providers' exports (`MockPhone`, `log_notifier`)
-//! and the stand-in product's frame builders (`product-native`).
-//!
-//! Why it reads the same as the web host crate: see "One host crate per host" in
-//! `docs/departures-from-the-rfc.md`.
+//! `README.md` describes its role in the demo.
 
 use std::sync::Arc;
 

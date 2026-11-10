@@ -1,7 +1,7 @@
 // A Swift host: the core and both providers linked into one library by the
 // host's own crate, `apps/host-app-native`. The app implements storage
-// and confirmation, wraps the wallet provider in Swift to see every request the
-// core sends to it, and plays a product by sending protocol frames.
+// and confirmation. It wraps the wallet provider in Swift to see every request
+// the core sends to it, and plays a product by sending protocol frames.
 //
 // A native app has no TypeScript client, so the product's frames come from the
 // stand-in product's frame builders (`signRawFrame`, `describeFrame`, ...): built

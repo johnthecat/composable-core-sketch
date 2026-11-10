@@ -1,9 +1,16 @@
 //! Interface crate of the core: everything a host supplies to the core is an
-//! extension point declared here, one public module per extension point, such
-//! as [`wallet`], which holds its trait, its error, the types it names and,
-//! on `wasm32`, its web glue. The core re-exports this crate as
-//! `host_runtime::host::extension`. A provider depends on this crate, never on
-//! the core.
+//! extension point declared here.
+//!
+//! There is one public module per extension point, such as [`wallet`], which
+//! holds:
+//!
+//! - its trait;
+//! - its error;
+//! - the types it names;
+//! - on `wasm32`, its web glue.
+//!
+//! The core re-exports this crate as `host_runtime::host::extension`. A
+//! provider depends on this crate, never on the core.
 //!
 //! Required by every host: [`ProductStorage`](storage::ProductStorage) and
 //! [`UserConfirmation`](confirmation::UserConfirmation), and for each product it frames a
@@ -49,8 +56,8 @@
 //!
 //! When the core drops a call, a Swift or Kotlin implementation's task is
 //! cancelled. A JS promise cannot be cancelled, so a JS implementation runs
-//! on and its result is discarded, as is the result of a Rust implementation
-//! that a Swift, Kotlin or JS wrapper awaits.
+//! on and its result is discarded. The result of a Rust implementation that a
+//! Swift, Kotlin or JS wrapper awaits is discarded too.
 //!
 //! The attributes add the UniFFI export for Swift and Kotlin and the web glue
 //! (`Js<Trait>`, `Foreign<Trait>`, `Wasm<Trait>`, built over the helpers in the

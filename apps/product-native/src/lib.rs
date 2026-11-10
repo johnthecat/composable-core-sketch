@@ -1,11 +1,7 @@
-//! A stand-in product for the Swift and Kotlin demos.
+//! A stand-in product for the Swift and Kotlin demos: it encodes a product's
+//! frames with the protocol crate's own types and reads frames back as text.
 //!
-//! Native hosts run products in web views, which speak the protocol through the
-//! TypeScript client. The command-line demos have no web view, so they build a
-//! product's frames here instead: encoded by the protocol crate's own types, so
-//! the bytes are exactly what the client sends, and read back as text. This is
-//! a test helper, not a product SDK. The native host crate links it like a
-//! provider, so its exports reach the apps from the same library.
+//! `README.md` describes its role in the demo.
 
 use std::fmt::Debug;
 
