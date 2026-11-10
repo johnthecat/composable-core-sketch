@@ -1,7 +1,7 @@
 //! The `ProductStorage` extension point: where products' values persist.
 
+use host_macros::{extension_error, extension_point};
 use protocol::Bytes;
-use sketch_macros::{extension_error, extension_point};
 
 /// Why a value was not read or written.
 #[extension_error]

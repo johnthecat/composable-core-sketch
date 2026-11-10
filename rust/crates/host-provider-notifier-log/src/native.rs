@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use host_extension::Notifier;
+use host_extension::notifier::Notifier;
 
 use crate::LogNotifier;
 

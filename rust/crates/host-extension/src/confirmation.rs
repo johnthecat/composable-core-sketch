@@ -1,8 +1,8 @@
 //! The `UserConfirmation` extension point: the host asks the user before the
 //! core goes on.
 
+use host_macros::{extension_error, extension_point, extension_type};
 use protocol::{Bytes, Bytes32};
-use sketch_macros::{extension_error, extension_point, extension_type};
 
 /// What the host asks the user to confirm.
 #[extension_type]
@@ -13,7 +13,7 @@ pub enum UserConfirmationReview {
 		product_id: String,
 		/// Public key of the account to sign with.
 		public_key: Bytes32,
-		/// The bytes to sign, before the core wraps them.
+		/// The bytes to sign, as the product sent them.
 		payload: Bytes,
 	},
 }

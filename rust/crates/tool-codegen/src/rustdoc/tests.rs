@@ -66,17 +66,16 @@ fn a_newtype_resolves_to_its_field_and_a_record_stays_named() {
 }
 
 #[test]
-fn a_glob_re_export_of_a_local_module_exports_its_items() {
+fn a_public_module_exports_its_items() {
 	let krate = parse(
 		&json!({
 			"format_version": MIN_FORMAT_VERSION,
 			"root": 0,
 			"index": {
-				"0": { "name": "host_extension", "docs": null, "inner": { "module": { "items": [1, 4] } } },
-				"1": { "name": "wallet", "docs": null, "inner": { "use": { "id": 2, "is_glob": true } } },
-				"2": { "name": "wallet", "docs": null, "inner": { "module": { "items": [3] } } },
-				"3": { "name": "Wallet", "docs": null, "inner": { "trait": { "items": [] } } },
-				"4": { "name": "Notifier", "docs": null, "inner": { "trait": { "items": [] } } }
+				"0": { "name": "host_extension", "docs": null, "inner": { "module": { "items": [1, 3] } } },
+				"1": { "name": "wallet", "docs": null, "inner": { "module": { "items": [2] } } },
+				"2": { "name": "Wallet", "docs": null, "inner": { "trait": { "items": [] } } },
+				"3": { "name": "Notifier", "docs": null, "inner": { "trait": { "items": [] } } }
 			},
 			"paths": {}
 		})
@@ -84,8 +83,12 @@ fn a_glob_re_export_of_a_local_module_exports_its_items() {
 	)
 	.unwrap();
 
-	let names: Vec<_> =
-		krate.root_items().unwrap().into_iter().map(|item| item.name.clone()).collect();
+	let names: Vec<_> = krate
+		.root_items()
+		.unwrap()
+		.into_iter()
+		.map(|(_, item)| item.name.clone())
+		.collect();
 
 	assert_eq!(names, [Some("Wallet".to_string()), Some("Notifier".to_string())]);
 }

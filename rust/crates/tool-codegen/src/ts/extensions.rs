@@ -1,4 +1,4 @@
-//! `extensions.ts` in `@sketch/host`: the TypeScript interface of each
+//! `extensions.ts` in `@sketch/host-extension`: the TypeScript interface of each
 //! extension point, the types it names, and one exception class per declared
 //! error.
 //!
@@ -13,24 +13,22 @@ use std::fmt::Write;
 use heck::ToLowerCamelCase;
 use indoc::writedoc;
 
-use super::types::{Imports, header, jsdoc, ts_type, type_declaration};
+use super::types::{header, jsdoc, ts_type, type_declaration};
 use crate::{
 	extension::{ExtensionMethod, ExtensionTrait, Param, Returns},
 	model::{TypeDef, TypeName, TypeRef},
 };
 
 /// `extensions.ts` for the extension points of `crate_name`, with `types`, every
-/// type they name.
+/// type they name. A type another crate defines is imported from the product
+/// client.
 pub fn extensions(crate_name: &str, traits: &[ExtensionTrait], types: &[TypeDef]) -> String {
-	let mut imports = Imports::default();
 	let mut body = String::new();
 	for def in types.iter().filter(|def| def.name.crate_name() == crate_name) {
-		write!(body, "\n{}", type_declaration(def, &mut imports))
-			.expect("writing to a String cannot fail");
+		write!(body, "\n{}", type_declaration(def)).expect("writing to a String cannot fail");
 	}
 	for (error, extension) in errors(traits) {
-		imports.record(error);
-		let error = error.ts_name();
+		let error = error.rust_name();
 		writedoc!(
 			body,
 			r#"
@@ -58,12 +56,7 @@ pub fn extensions(crate_name: &str, traits: &[ExtensionTrait], types: &[TypeDef]
 		.expect("writing to a String cannot fail");
 	}
 	for extension in traits {
-		let methods = extension
-			.methods
-			.iter()
-			.map(|method| signature(method, &mut imports))
-			.collect::<Vec<_>>()
-			.join("\n");
+		let methods = extension.methods.iter().map(signature).collect::<Vec<_>>().join("\n");
 		writedoc!(
 			body,
 			"
@@ -76,7 +69,12 @@ pub fn extensions(crate_name: &str, traits: &[ExtensionTrait], types: &[TypeDef]
 		)
 		.expect("writing to a String cannot fail");
 	}
-	let external = imports.external(|name| name.crate_name() != crate_name);
+	let mut external: Vec<String> = types
+		.iter()
+		.filter(|def| def.name.crate_name() != crate_name)
+		.map(|def| def.name.rust_name().to_string())
+		.collect();
+	external.sort();
 	let import = if external.is_empty() {
 		String::new()
 	} else {
@@ -99,13 +97,13 @@ fn errors(traits: &[ExtensionTrait]) -> Vec<(&TypeName, &str)> {
 		.collect()
 }
 
-fn signature(method: &ExtensionMethod, imports: &mut Imports) -> String {
+fn signature(method: &ExtensionMethod) -> String {
 	let params = method
 		.params
 		.iter()
 		.map(|(name, param)| {
 			let ts = match param {
-				Param::Value(type_ref) => ts_type(type_ref, imports),
+				Param::Value(type_ref) => ts_type(type_ref),
 				Param::Interface(name) => name.clone(),
 			};
 			format!("{}: {ts}", name.to_lower_camel_case())
@@ -114,7 +112,7 @@ fn signature(method: &ExtensionMethod, imports: &mut Imports) -> String {
 		.join(", ");
 	let returns = match &method.returns {
 		Returns::Call { ok: TypeRef::Unit, .. } => "Promise<void>".to_string(),
-		Returns::Call { ok, .. } => format!("Promise<{}>", ts_type(ok, imports)),
+		Returns::Call { ok, .. } => format!("Promise<{}>", ts_type(ok)),
 		Returns::Notification => "void".to_string(),
 	};
 	format!(
@@ -123,3 +121,6 @@ fn signature(method: &ExtensionMethod, imports: &mut Imports) -> String {
 		method.name.to_lower_camel_case()
 	)
 }
+
+#[cfg(test)]
+mod tests;

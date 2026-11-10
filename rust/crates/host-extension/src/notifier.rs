@@ -1,7 +1,7 @@
 //! The `Notifier` extension point, the RFC's example: notices shown to the
 //! user.
 
-use sketch_macros::{extension_error, extension_point};
+use host_macros::{extension_error, extension_point};
 
 /// Why a notice was not shown.
 #[extension_error]

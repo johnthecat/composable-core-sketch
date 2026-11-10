@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use futures_timer::Delay;
 use host_extension::{
-	AccountsListener, Bytes32, Bytes64, ProductAccount, SignRequest, Signature, Wallet, WalletError,
+	Bytes32, Bytes64,
+	wallet::{AccountsListener, ProductAccount, SignRequest, Signature, Wallet, WalletError},
 };
 use sha2::{Digest, Sha256, Sha512};
 
@@ -16,7 +17,8 @@ pub enum PhoneDecision {
 	Approve,
 	/// The user declines: [`WalletError::Rejected`].
 	Decline,
-	/// The phone never answers: an undeclared [`WalletError::Unknown`].
+	/// The phone never answers, so the sign call stays pending until the core
+	/// drops it.
 	Unreachable,
 }
 
@@ -26,7 +28,7 @@ pub enum PhoneDecision {
 /// and bind a payload to it for the demo, and are not cryptographic keys or
 /// signatures.
 pub struct MockWallet {
-	state: Arc<Mutex<State>>,
+	state: Mutex<State>,
 }
 
 struct State {
@@ -42,12 +44,12 @@ impl MockWallet {
 	/// `sign_delay`.
 	pub fn new(sign_delay: Duration) -> Self {
 		Self {
-			state: Arc::new(Mutex::new(State {
+			state: Mutex::new(State {
 				accounts: Vec::new(),
 				decision: PhoneDecision::Approve,
 				sign_delay,
 				listener: None,
-			})),
+			}),
 		}
 	}
 
@@ -55,7 +57,7 @@ impl MockWallet {
 	pub fn add_account(&self, name: &str) -> ProductAccount {
 		let (account, accounts, listener) = {
 			let mut state = lock(&self.state);
-			let index = u32::try_from(state.accounts.len()).unwrap_or(u32::MAX);
+			let index = u32::try_from(state.accounts.len()).expect("a mock holds few accounts");
 			let account =
 				ProductAccount { public_key: mock_public_key(name, index), name: name.into() };
 			state.accounts.push(account.clone());
@@ -78,6 +80,19 @@ impl MockWallet {
 	pub fn set_sign_delay(&self, sign_delay: Duration) {
 		lock(&self.state).sign_delay = sign_delay;
 	}
+	/// How the phone answers `request` now, or `None` when it never answers.
+	fn answer(&self, request: &SignRequest) -> Option<Result<Signature, WalletError>> {
+		let state = lock(&self.state);
+		match state.decision {
+			PhoneDecision::Approve => {},
+			PhoneDecision::Decline => return Some(Err(WalletError::Rejected)),
+			PhoneDecision::Unreachable => return None,
+		}
+		if !state.accounts.iter().any(|account| account.public_key == request.public_key) {
+			return Some(Err(WalletError::UnknownAccount));
+		}
+		Some(Ok(mock_signature(request)))
+	}
 }
 
 #[async_trait::async_trait]
@@ -90,18 +105,10 @@ impl Wallet for MockWallet {
 		let sign_delay = lock(&self.state).sign_delay;
 		Delay::new(sign_delay).await;
 
-		let state = lock(&self.state);
-		match state.decision {
-			PhoneDecision::Approve => {},
-			PhoneDecision::Decline => return Err(WalletError::Rejected),
-			PhoneDecision::Unreachable => {
-				return Err(WalletError::from("the phone did not answer".to_string()));
-			},
+		match self.answer(&request) {
+			Some(answer) => answer,
+			None => core::future::pending().await,
 		}
-		if !state.accounts.iter().any(|account| account.public_key == request.public_key) {
-			return Err(WalletError::UnknownAccount);
-		}
-		Ok(mock_signature(&request))
 	}
 
 	fn set_accounts_listener(&self, listener: Arc<dyn AccountsListener>) {

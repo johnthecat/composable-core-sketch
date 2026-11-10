@@ -1,12 +1,11 @@
-//! The product protocol: the API a host serves to products, the payloads its
-//! methods carry, and the versioned envelopes those payloads travel in.
+//! The product protocol: the API a host serves to products, and the payloads
+//! its methods carry.
 //!
-//! [`api`] declares one trait per service, each method tagged with its wire id.
-//! Payloads live in per-version modules ([`v01`]); [`versioned`] wraps them in
-//! the envelopes that cross the wire, and [`latest`] names the newest payload of
-//! each. `#[wire_trait]` writes each trait's method table ([`dispatch`]), which
-//! the host runtime serves; `tool-codegen` reads this crate's rustdoc JSON to
-//! generate the TypeScript product client.
+//! [`api`] declares one trait per service, each method tagged with its wire id,
+//! next to the request, response and error types it carries. `#[wire_trait]`
+//! writes each trait's method table ([`dispatch`]), which the host runtime
+//! serves; `tool-codegen` reads this crate's rustdoc JSON to generate the
+//! TypeScript product client.
 //!
 //! This crate holds no runtime, so an interface crate may name its types in
 //! extension point signatures without depending on the core.
@@ -22,50 +21,13 @@ use parity_scale_codec::{Decode, Encode};
 pub mod api;
 mod bytes;
 pub mod dispatch;
-pub mod v01;
-pub mod versioned;
+pub mod frame;
 
 pub use bytes::{Bytes, Bytes32, Bytes64};
-pub use sketch_macros::{wire, wire_trait};
+pub use host_macros::{wire, wire_trait};
 
 #[cfg(not(target_arch = "wasm32"))]
 uniffi::setup_scaffolding!();
-
-/// Newest payload types, unwrapped from their versioned envelopes. Code outside
-/// this crate names payloads from here rather than from a version module.
-pub mod latest {
-	pub use crate::v01::{
-		GenericError, HostLocalStorageError, HostLocalStorageReadResponse, HostSignRawError,
-		ProductAccount,
-	};
-	use crate::versioned::{self, Versioned};
-
-	/// Latest payload type of a versioned envelope.
-	pub type LatestOf<T> = <T as Versioned>::Latest;
-
-	/// The accounts a product may sign with.
-	pub type HostAccountGetAccountsResponse =
-		LatestOf<versioned::account::HostAccountGetAccountsResponse>;
-	/// The account list after a change.
-	pub type HostAccountAccountsSubscribeItem =
-		LatestOf<versioned::account::HostAccountAccountsSubscribeItem>;
-	/// Raw-bytes signing request.
-	pub type HostSignRawRequest = LatestOf<versioned::signing::HostSignRawRequest>;
-	/// Raw-bytes signing result.
-	pub type HostSignRawResponse = LatestOf<versioned::signing::HostSignRawResponse>;
-	/// Product storage read request.
-	pub type HostLocalStorageReadRequest =
-		LatestOf<versioned::local_storage::HostLocalStorageReadRequest>;
-	/// Product storage write request.
-	pub type HostLocalStorageWriteRequest =
-		LatestOf<versioned::local_storage::HostLocalStorageWriteRequest>;
-	/// Notice a product asks the host to show.
-	pub type HostPushNotificationRequest =
-		LatestOf<versioned::notifications::HostPushNotificationRequest>;
-	/// Why a notice was not shown.
-	pub type HostPushNotificationError =
-		LatestOf<versioned::notifications::HostPushNotificationError>;
-}
 
 /// How a call failed: with the method's own error, or for a reason any method
 /// can fail with.
@@ -88,25 +50,6 @@ pub enum CallError<D> {
 		/// Human-readable reason.
 		reason: String,
 	},
-}
-
-impl<D> CallError<D> {
-	/// Maps the method's own error, keeping every other variant.
-	pub fn map_domain<T>(self, map: impl FnOnce(D) -> T) -> CallError<T> {
-		match self {
-			Self::Domain(domain) => CallError::Domain(map(domain)),
-			Self::Denied => CallError::Denied,
-			Self::Unsupported => CallError::Unsupported,
-			Self::MalformedFrame { reason } => CallError::MalformedFrame { reason },
-			Self::HostFailure { reason } => CallError::HostFailure { reason },
-		}
-	}
-}
-
-/// Per-call context the dispatcher hands every method.
-pub struct CallContext {
-	/// The request id of the frame that started the call.
-	pub request_id: String,
 }
 
 /// What a subscription method returns: a stream of items that ends with its

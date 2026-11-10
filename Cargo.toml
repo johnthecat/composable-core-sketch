@@ -4,6 +4,7 @@ members = [
 	"rust/crates/*",
 	"apps/host-app-web/host-app-web-wasm",
 	"apps/host-app-native",
+	"apps/product-native",
 ]
 
 [workspace.package]
@@ -38,19 +39,16 @@ wasm-bindgen-test = "0.3"
 web-sys = "0.3"
 
 host-extension = { path = "rust/crates/host-extension" }
+host-macros = { path = "rust/crates/host-macros" }
 host-provider-notifier-log = { path = "rust/crates/host-provider-notifier-log" }
 host-provider-wallet-mock = { path = "rust/crates/host-provider-wallet-mock" }
 host-runtime = { path = "rust/crates/host-runtime" }
+product-native = { path = "apps/product-native" }
 protocol = { path = "rust/crates/protocol" }
-sketch-macros = { path = "rust/crates/sketch-macros" }
 
 [workspace.lints.rust]
 missing_docs = "warn"
 unsafe_code = "deny"
-
-[workspace.lints.clippy]
-complexity = "warn"
-correctness = "warn"
 
 [profile.release]
 opt-level = "z"

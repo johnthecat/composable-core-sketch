@@ -9,9 +9,14 @@ import {
   createClient,
   createMessagePortProvider,
   createTransport,
+  decodeWireMessage,
+  MESSAGE_TYPE_RESPONSE,
+  wire,
+  type ProtocolMessage,
   type TrUApiClient,
 } from "@sketch/protocol-client";
-import { connectProductPort, type Notifier, type Wallet } from "@sketch/host";
+import { connectProductPort } from "@sketch/host";
+import type { Notifier, Wallet } from "@sketch/host-extension";
 
 import init, {
   hostRuntime,
@@ -33,6 +38,8 @@ beforeAll(async () => {
 
 interface Composition {
   client: TrUApiClient;
+  /** Every frame the core sent to `client`, as the product's port received it. */
+  frames: ProtocolMessage[];
   /** A client of another product served by the same runtime. */
   connect(productId: string): TrUApiClient;
   phone: MockPhone;
@@ -79,16 +86,18 @@ async function compose(options: {
     wallets[options.wallet],
     options.notifier ? notifier : undefined,
   );
-  const connect = (productId: string) => {
+  const connect = (productId: string, frames: ProtocolMessage[] = []) => {
     const channel = new MessageChannel();
     connectProductPort(runtime, { productId }, channel.port1);
-    return createClient(
-      createTransport(createMessagePortProvider(channel.port2)),
-    );
+    const provider = createMessagePortProvider(channel.port2);
+    provider.subscribe((frame) => frames.push(decodeWireMessage(frame)));
+    return createClient(createTransport(provider));
   };
   const [alice] = await phone.wallet().accounts();
+  const frames: ProtocolMessage[] = [];
   return {
-    client: connect("test-product"),
+    client: connect("test-product", frames),
+    frames,
     connect,
     phone,
     typeScriptWallet,
@@ -111,7 +120,7 @@ const sign = (composition: Composition, publicKey = composition.alice) =>
   });
 
 describe("a product talking to the core through frames", () => {
-  test("a confirmed signature: the wrapper sees the account check and the wrapped message", async () => {
+  test("a confirmed signature: the wrapper sees the account check and the product's message", async () => {
     const composition = await compose({ wallet: "tracked" });
 
     const result = await sign(composition);
@@ -127,8 +136,8 @@ describe("a product talking to the core through frames", () => {
       {
         method: "sign",
         status: "answered",
-        // 17 bytes: the core wraps "hi" in `<Bytes>…</Bytes>`.
-        summary: expect.stringMatching(/^sign 17 bytes with /),
+        // "hi", as the product sent it.
+        summary: expect.stringMatching(/^sign 2 bytes with /),
         outcome: expect.stringMatching(/^signature /),
       },
     ]);
@@ -142,7 +151,7 @@ describe("a product talking to the core through frames", () => {
 
     expect(result.isErr() && result.error).toEqual({
       tag: "Domain",
-      value: { tag: "V1", value: { tag: "Rejected", value: undefined } },
+      value: { tag: "Rejected", value: undefined },
     });
     expect(composition.requests().at(-1)?.status).toBe("rejected");
   });
@@ -189,6 +198,43 @@ describe("a product talking to the core through frames", () => {
     });
     return lists;
   };
+
+  // No timing: the host serves the product's frames in order, so the answer to
+  // a call made after unsubscribing proves the stop was served; and an item the
+  // core sent for the next push would reach the product before the answer to a
+  // call made after that push. The frames are counted at the port, because the
+  // client ignores those of a subscription it ended.
+  test("a stopped subscription receives nothing more", async () => {
+    const composition = await compose({ wallet: "tracked" });
+    const lists: string[][] = [];
+    let firstItem = () => {};
+    const first = new Promise<void>((resolve) => (firstItem = resolve));
+    const subscription = composition.client.account
+      .accountsSubscribe()
+      .subscribe({
+        next: (item) => {
+          lists.push(item.accounts.map((account) => account.name));
+          firstItem();
+        },
+      });
+    await first;
+
+    subscription.unsubscribe();
+    await composition.client.account.getAccounts();
+    composition.phone.addAccount("bob");
+    await composition.client.account.getAccounts();
+    const items = composition.frames.filter(
+      (frame) =>
+        frame.traitId === wire.ACCOUNT_ACCOUNTS_SUBSCRIBE.trait &&
+        frame.methodId === wire.ACCOUNT_ACCOUNTS_SUBSCRIBE.method &&
+        frame.messageType === MESSAGE_TYPE_RESPONSE,
+    );
+
+    expect({ lists, items: items.length }).toEqual({
+      lists: [["alice"]],
+      items: 1,
+    });
+  });
 
   // The wallet pushes each change to the listener the tracking wrapper gave it,
   // which records it and passes it to the core's.

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use host_extension::{JsNotifier, WasmNotifier};
+use host_extension::notifier::{JsNotifier, WasmNotifier};
 use wasm_bindgen::prelude::*;
 
 use crate::LogNotifier;

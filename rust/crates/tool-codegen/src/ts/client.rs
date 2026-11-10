@@ -7,9 +7,9 @@ use std::fmt::Write;
 use heck::{ToLowerCamelCase, ToShoutySnakeCase};
 use indoc::{formatdoc, writedoc};
 
-use super::types::{Imports, header, jsdoc, ts_type, type_definition};
+use super::types::{codec, header, jsdoc, ts_type, type_definition};
 use crate::{
-	model::{EnumVariant, TypeDef, TypeDefKind, TypeRef, VariantShape},
+	model::{TypeDef, TypeRef},
 	protocol::{ApiKind, ApiMethod, ApiTrait},
 };
 
@@ -17,11 +17,7 @@ const SOURCE: &str = "the `protocol` crate";
 
 /// `types.ts`: every type the protocol names.
 pub fn types(defs: &[TypeDef]) -> String {
-	let mut imports = Imports::default();
-	let body: String = defs
-		.iter()
-		.map(|def| format!("\n{}", type_definition(def, &mut imports)))
-		.collect();
+	let body: String = defs.iter().map(|def| format!("\n{}", type_definition(def))).collect();
 	format!("{}\n\nimport * as S from \"../scale.js\";\n{body}", header(SOURCE))
 }
 
@@ -56,13 +52,13 @@ pub fn wire_constant(api: &ApiTrait, method: &ApiMethod) -> String {
 
 /// `client.ts`: one class per service and `createClient` binding them to a
 /// transport.
-pub fn client(traits: &[ApiTrait], defs: &[TypeDef]) -> String {
+pub fn client(traits: &[ApiTrait]) -> String {
 	let mut classes = String::new();
 	for api in traits {
 		let methods = api
 			.methods
 			.iter()
-			.map(|method| client_method(api, method, defs))
+			.map(|method| client_method(api, method))
 			.collect::<Vec<_>>()
 			.join("\n");
 		writedoc!(
@@ -121,116 +117,75 @@ pub fn client(traits: &[ApiTrait], defs: &[TypeDef]) -> String {
 	)
 }
 
-fn client_method(api: &ApiTrait, method: &ApiMethod, defs: &[TypeDef]) -> String {
-	let mut imports = Imports::default();
+fn client_method(api: &ApiTrait, method: &ApiMethod) -> String {
 	let name = method.name.to_lower_camel_case();
 	let docs = jsdoc(method.docs.as_deref(), "  ");
-	let request_envelope = envelope_name(&method.request);
-	let (param, request_value) = match latest_payload(&method.request, defs) {
-		Some(payload) => (format!("request: {}", qualified(&payload, &mut imports)), "request"),
-		None => (String::new(), "undefined"),
+	let (param, payload) = match &method.request {
+		Some(request) => (
+			format!("request: {}", qualified(request)),
+			format!("{}.enc(request)", qualified_codec(request)),
+		),
+		None => (String::new(), "new Uint8Array()".to_string()),
 	};
-	let encode_request = format!(
-		"T.{request_envelope}.enc({{ tag: \"V{version}\", value: {request_value} }})",
-		version = latest_version(&method.request, defs),
-	);
 	let ids = format!("W.{}", wire_constant(api, method));
 	match &method.kind {
 		ApiKind::Request { response, error } => {
-			let ok = latest_payload(response, defs)
-				.map(|payload| qualified(&payload, &mut imports))
-				.unwrap_or_else(|| "undefined".into());
-			let err = format!("S.CallErrorValue<T.{}>", envelope_name(error));
+			let ok = qualified(response);
+			let err = format!("S.CallErrorValue<{}>", qualified(error));
 			formatdoc!(
 				"
 				{docs}  {name}({param}): ResultAsync<{ok}, {err}> {{
 				    return this.#transport.request<{ok}, {err}>({{
 				      ids: {ids},
-				      payload: {encode_request},
-				      decodeResponse: (payload) => {{
-				        const result = S.Result(T.{response}, S.CallError(T.{error})).dec(payload);
-				        return result.success ? {{ success: true, value: result.value.value }} : result;
-				      }},
+				      payload: {payload},
+				      decodeResponse: (payload) =>
+				        S.Result({response}, S.CallError({error})).dec(payload),
 				    }});
 				  }}
 				",
-				response = envelope_name(response),
-				error = envelope_name(error),
+				response = qualified_codec(response),
+				error = qualified_codec(error),
 			)
 		},
 		ApiKind::Subscription { item, error } => {
-			let item_type = latest_payload(item, defs)
-				.map(|payload| qualified(&payload, &mut imports))
-				.unwrap_or_else(|| "undefined".into());
-			let err = format!("S.CallErrorValue<T.{}>", envelope_name(error));
+			let item_type = qualified(item);
+			let err = format!("S.CallErrorValue<{}>", qualified(error));
 			formatdoc!(
 				"
 				{docs}  {name}({param}): ObservableLike<{item_type}, {err}> {{
 				    return createObservable<{item_type}, {err}>({{
 				      transport: this.#transport,
 				      ids: {ids},
-				      payload: {encode_request},
-				      decodeItem: (payload) => T.{item}.dec(payload).value,
-				      decodeInterrupt: interruptDecoder(S.CallError(T.{error})),
+				      payload: {payload},
+				      decodeItem: (payload) => {item}.dec(payload),
+				      decodeInterrupt: interruptDecoder(S.CallError({error})),
 				    }});
 				  }}
 				",
-				item = envelope_name(item),
-				error = envelope_name(error),
+				item = qualified_codec(item),
+				error = qualified_codec(error),
 			)
 		},
 	}
 }
 
-/// TypeScript name of a versioned envelope.
-fn envelope_name(type_ref: &TypeRef) -> String {
-	match type_ref {
-		TypeRef::Named(name) => name.ts_name(),
-		other => panic!("a protocol method names versioned envelopes, found {other:?}"),
-	}
-}
-
-/// The newest variant of an envelope.
-fn latest_variant<'d>(type_ref: &TypeRef, defs: &'d [TypeDef]) -> &'d EnumVariant {
-	let TypeRef::Named(name) = type_ref else {
-		panic!("a protocol method names versioned envelopes, found {type_ref:?}");
-	};
-	let def = defs
-		.iter()
-		.find(|def| &def.name == name)
-		.expect("envelopes are reachable types");
-	let TypeDefKind::Enum(variants) = &def.kind else {
-		panic!("the versioned envelope {name} is not an enum");
-	};
-	variants.last().expect("an envelope has a variant")
-}
-
-fn latest_version(type_ref: &TypeRef, defs: &[TypeDef]) -> usize {
-	let TypeRef::Named(name) = type_ref else { return 1 };
-	defs.iter()
-		.find(|def| &def.name == name)
-		.and_then(|def| match &def.kind {
-			TypeDefKind::Enum(variants) => Some(variants.len()),
-			TypeDefKind::Struct(_) => None,
-		})
-		.unwrap_or(1)
-}
-
-/// The payload of an envelope's newest variant, or `None` when it carries none.
-fn latest_payload(type_ref: &TypeRef, defs: &[TypeDef]) -> Option<TypeRef> {
-	match &latest_variant(type_ref, defs).shape {
-		VariantShape::Newtype(payload) => Some(payload.clone()),
-		VariantShape::Unit => None,
-		VariantShape::Named(_) => panic!("a versioned envelope variant carries one payload"),
-	}
-}
-
 /// A type as `client.ts` names it, with structs and enums under `T.`.
-fn qualified(type_ref: &TypeRef, imports: &mut Imports) -> String {
+fn qualified(type_ref: &TypeRef) -> String {
 	match type_ref {
-		TypeRef::Named(name) => format!("T.{}", name.ts_name()),
-		TypeRef::Vec(element) => format!("{}[]", qualified(element, imports)),
-		TypeRef::Option(inner) => format!("{} | undefined", qualified(inner, imports)),
-		other => ts_type(other, imports),
+		TypeRef::Named(name) => format!("T.{}", name.rust_name()),
+		TypeRef::Vec(element) => format!("{}[]", qualified(element)),
+		TypeRef::Option(inner) => format!("{} | undefined", qualified(inner)),
+		other => ts_type(other),
+	}
+}
+
+/// The codec of a type as `client.ts` names it, with structs and enums under
+/// `T.`.
+fn qualified_codec(type_ref: &TypeRef) -> String {
+	match type_ref {
+		TypeRef::Named(name) => format!("T.{}", name.rust_name()),
+		TypeRef::Vec(element) => format!("S.Vector({})", qualified_codec(element)),
+		TypeRef::Option(inner) => format!("S.Option({})", qualified_codec(inner)),
+		other => codec(other),
 	}
 }

@@ -1,0 +1,15 @@
+[package]
+name = "product-native"
+version = "0.1.0"
+description = "A stand-in product for the native demos: builds a product's request frames and reads the host's"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+parity-scale-codec.workspace = true
+protocol.workspace = true
+uniffi.workspace = true
+
+[lints]
+workspace = true

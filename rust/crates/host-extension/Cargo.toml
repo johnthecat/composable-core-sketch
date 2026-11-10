@@ -8,8 +8,8 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+host-macros.workspace = true
 protocol.workspace = true
-sketch-macros.workspace = true
 thiserror.workspace = true
 
 

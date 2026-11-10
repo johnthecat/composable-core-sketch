@@ -12,7 +12,9 @@ use serde_json::Value;
 
 use crate::{
 	model::{TypeDefKind, TypeName, TypeRef, VariantShape},
-	rustdoc::{Crate, Item, World, async_trait_output, clean_docs, params, path_leaf, type_args},
+	rustdoc::{
+		Crate, Item, World, async_trait_output, clean_docs, params, path_leaf, tag_value, type_args,
+	},
 };
 
 /// An extension point.
@@ -73,10 +75,25 @@ impl ExtensionMethod {
 	}
 }
 
+/// Every `#[extension_type]` the crate root of `krate` exports, which the
+/// attribute tags `@extension_type=1`, including one no trait names, such as
+/// the `ProductContext` the host hands the core.
+pub fn root_types(krate: &Crate) -> Result<Vec<TypeRef>> {
+	let mut types = Vec::new();
+	for (id, item) in krate.root_items()? {
+		if tag_value(item.docs.as_deref(), "extension_type") == Some(1) &&
+			let Some(path) = krate.local_path(&id)
+		{
+			types.push(TypeRef::Named(TypeName::new(path.path.clone())));
+		}
+	}
+	Ok(types)
+}
+
 /// The extension points the crate root of `krate` exports.
 pub fn extension_traits(world: &World, krate: &Crate) -> Result<Vec<ExtensionTrait>> {
 	let mut traits = Vec::new();
-	for item in krate.root_items()? {
+	for (_, item) in krate.root_items()? {
 		if item.inner.get("trait").is_some() {
 			traits.push(extension_trait(world, krate, item)?);
 		}

@@ -1,29 +1,18 @@
 //! The wasm-bindgen surface: [`WasmHostRuntime`], which a host crate's
 //! [`crate::constructor`] returns, and the product runtimes it hands out. JS
-//! sees them as `HostRuntime` and `ProductRuntime`, and the types they take
-//! are declared once, in `@sketch/host`'s `runtime.ts`.
+//! sees them as `HostRuntime` and `ProductRuntime`. The types they take,
+//! `ProductContext` and `FrameSink`, are the interface crate's, generated into
+//! the same TypeScript module as the extension points.
 
 use std::sync::Arc;
 
-use js_sys::{Function, Reflect, Uint8Array};
-use send_wrapper::SendWrapper;
-use wasm_bindgen::{JsCast, prelude::*};
+use host_extension::{
+	from_js,
+	product::{ForeignFrameSink, JsFrameSink, ProductContext},
+};
+use wasm_bindgen::prelude::*;
 
-use crate::{FrameSink, HostRuntime, ProductContext, ProductRuntime};
-
-/// A JS `FrameSink`: sends a product runtime's frames to its `emitFrame`.
-struct JsFrameSink {
-	emit_frame: SendWrapper<Function>,
-}
-
-impl FrameSink for JsFrameSink {
-	fn emit_frame(&self, frame: Vec<u8>) {
-		let frame = Uint8Array::from(frame.as_slice());
-		if let Err(error) = self.emit_frame.call1(&JsValue::NULL, &frame) {
-			web_sys::console::error_1(&error);
-		}
-	}
-}
+use crate::{HostRuntime, ProductRuntime};
 
 /// The host runtime, as a web host holds it.
 #[wasm_bindgen(js_name = HostRuntime)]
@@ -40,28 +29,24 @@ impl WasmHostRuntime {
 
 #[wasm_bindgen(js_class = HostRuntime)]
 impl WasmHostRuntime {
-	/// A runtime serving `product`, which sends its frames to
-	/// `sink.emitFrame`.
+	/// A runtime serving `product`, which sends its frames to `sink`.
 	#[wasm_bindgen(js_name = productRuntime)]
 	pub fn product_runtime(
 		&self,
-		#[wasm_bindgen(unchecked_param_type = "HostExtension.Product")] product: JsValue,
-		#[wasm_bindgen(unchecked_param_type = "HostExtension.FrameSink")] sink: JsValue,
-	) -> Result<WasmProductRuntime, JsValue> {
-		let product_id = Reflect::get(&product, &JsValue::from_str("productId"))?
-			.as_string()
-			.ok_or_else(|| JsValue::from_str("product.productId must be a string"))?;
-		let emit_frame = Reflect::get(&sink, &JsValue::from_str("emitFrame"))?
-			.dyn_into::<Function>()
-			.map_err(|_| JsValue::from_str("sink.emitFrame must be a function"))?;
-		let sink = Arc::new(JsFrameSink { emit_frame: SendWrapper::new(emit_frame) });
+		#[wasm_bindgen(unchecked_param_type = "HostExtension.ProductContext")] product: JsValue,
+		sink: JsFrameSink,
+	) -> Result<WasmProductRuntime, JsError> {
+		let product =
+			from_js::<ProductContext, String>(product).map_err(|reason| JsError::new(&reason))?;
+		let sink = ForeignFrameSink::new(sink).map_err(|reason| JsError::new(&reason))?;
 		Ok(WasmProductRuntime {
-			runtime: self.runtime.product_runtime(ProductContext { product_id }, sink),
+			runtime: Arc::clone(&self.runtime).product_runtime(product, Arc::new(sink)),
 		})
 	}
 }
 
-/// One product's connection, as a web host drives it. `free()` ends it.
+/// One product's connection, as a web host drives it. `free()` ends it, and
+/// drops every call still in flight.
 #[wasm_bindgen(js_name = ProductRuntime)]
 pub struct WasmProductRuntime {
 	runtime: Arc<ProductRuntime>,
@@ -69,13 +54,12 @@ pub struct WasmProductRuntime {
 
 #[wasm_bindgen(js_class = ProductRuntime)]
 impl WasmProductRuntime {
-	/// Serve one frame from the product. Responses and subscription items go
-	/// to `emitFrame`.
+	/// Start serving one frame from the product. Responses and subscription
+	/// items go to the sink.
 	#[wasm_bindgen(js_name = receiveFrame)]
-	pub async fn receive_frame(&self, frame: Vec<u8>) -> Result<(), JsValue> {
+	pub fn receive_frame(&self, frame: Vec<u8>) -> Result<(), JsError> {
 		self.runtime
 			.receive_frame(frame)
-			.await
-			.map_err(|error| JsValue::from_str(&error.to_string()))
+			.map_err(|error| JsError::new(&error.to_string()))
 	}
 }

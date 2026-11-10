@@ -4,8 +4,8 @@
 // core sends to it, and plays a product by sending protocol frames.
 //
 // A native app has no TypeScript client, so the product's frames come from the
-// host crate's frame builders (`signRawFrame`, `describeFrame`, ...): built from the
-// protocol crate's types, they are the bytes a product's client sends.
+// stand-in product's frame builders (`signRawFrame`, `describeFrame`, ...): built
+// from the protocol crate's types, they are the bytes a product's client sends.
 
 import Foundation
 import HostAppNative
@@ -24,11 +24,19 @@ final class MemoryStorage: ProductStorage, @unchecked Sendable {
     }
 }
 
-/// Answers each confirmation as `approves` says.
+/// Answers each confirmation as `approves` says. The core calls it from its
+/// own threads, so the answer sits behind a lock.
 final class ScriptedConfirmation: UserConfirmation, @unchecked Sendable {
-    var approves = true
+    private let lock = NSLock()
+    private var answer = true
+
+    var approves: Bool {
+        get { lock.withLock { answer } }
+        set { lock.withLock { answer = newValue } }
+    }
 
     func confirmUserAction(review: UserConfirmationReview) async throws -> Bool {
+        let approves = self.approves
         if case let .signRaw(productId, _, payload) = review {
             let message = String(decoding: payload, as: UTF8.self)
             print("  [confirmation] \(productId) asks to sign \"\(message)\": \(approves ? "approved" : "denied")")
@@ -103,21 +111,38 @@ final class StatusNotifier: Notifier, @unchecked Sendable {
     }
 }
 
-/// Prints each frame the core sends to the product, and counts subscription
-/// items.
+/// Prints each frame the core sends to the product, and counts them, so the
+/// app waits for a frame instead of sleeping.
 final class PrintingSink: FrameSink, @unchecked Sendable {
-    private let lock = NSLock()
+    private let condition = NSCondition()
+    private var frameCount = 0
     private var itemCount = 0
 
     /// How many subscription items the product received.
-    var items: Int { lock.withLock { itemCount } }
+    var items: Int { condition.withLock { itemCount } }
 
     func emitFrame(frame: Data) {
         let received = describeFrame(frame: frame)
-        if received.leg == "item" {
-            lock.withLock { itemCount += 1 }
-        }
         print("  [product] <- \(received.leg) for \(received.requestId): \(received.outcome)")
+        condition.withLock {
+            frameCount += 1
+            if received.leg == .item {
+                itemCount += 1
+            }
+            condition.broadcast()
+        }
+    }
+
+    /// Waits until the product has received `count` frames in all.
+    func waitForFrames(_ count: Int) {
+        condition.withLock {
+            let deadline = Date().addingTimeInterval(5)
+            while frameCount < count {
+                if !condition.wait(until: deadline) {
+                    check(false, "frame \(count) arrived")
+                }
+            }
+        }
     }
 }
 
@@ -129,9 +154,12 @@ func check(_ holds: Bool, _ claim: String) {
     }
 }
 
-func send(_ product: ProductRuntime, _ label: String, _ frame: Data) async throws {
+/// Sends a product frame, then waits until the product has received
+/// `expecting` frames in all.
+func send(_ product: ProductRuntime, _ sink: PrintingSink, _ label: String, _ frame: Data, expecting: Int) throws {
     print("[product] -> \(label)")
-    try await product.receiveFrame(frame: frame)
+    try product.receiveFrame(frame: frame)
+    sink.waitForFrames(expecting)
 }
 
 // Rust and Swift share stdout; line buffering keeps their lines in order.
@@ -146,44 +174,43 @@ let runtime = hostRuntime(
     wallet: TrackingWallet(inner: phone.wallet()),
     notifier: StatusNotifier(inner: logNotifier())
 )
-let productSink = PrintingSink()
-let product = runtime.productRuntime(
-    product: ProductContext(productId: "swift-product"),
-    sink: productSink
-)
+let sink = PrintingSink()
+let product = runtime.productRuntime(product: ProductContext(productId: "swift-product"), sink: sink)
 let alice = try await phone.wallet().accounts()[0].publicKey
 let message = Data("hello from Swift".utf8)
 
-try await send(product, "account.getAccounts", getAccountsFrame(requestId: "1"))
-try await send(product, "signing.signRaw, confirmed", signRawFrame(requestId: "2", publicKey: alice, payload: message))
+try send(product, sink, "account.getAccounts", getAccountsFrame(requestId: "1"), expecting: 1)
+try send(product, sink, "signing.signRaw, confirmed", signRawFrame(requestId: "2", publicKey: alice, payload: message), expecting: 2)
 confirmation.approves = false
-try await send(product, "signing.signRaw, denied by the user", signRawFrame(requestId: "3", publicKey: alice, payload: message))
+try send(product, sink, "signing.signRaw, denied by the user", signRawFrame(requestId: "3", publicKey: alice, payload: message), expecting: 3)
 confirmation.approves = true
 phone.setDecision(decision: .decline)
-try await send(product, "signing.signRaw, declined on the phone", signRawFrame(requestId: "4", publicKey: alice, payload: message))
+try send(product, sink, "signing.signRaw, declined on the phone", signRawFrame(requestId: "4", publicKey: alice, payload: message), expecting: 4)
 phone.setDecision(decision: .approve)
-try await send(product, "localStorage.write", storageWriteFrame(requestId: "5", key: "note", value: Data("a note".utf8)))
-try await send(product, "localStorage.read", storageReadFrame(requestId: "6", key: "note"))
-try await send(product, "notifications.pushNotification", pushNotificationFrame(requestId: "7", text: "saved"))
-try await send(product, "account.accountsSubscribe", accountsSubscribeFrame(requestId: "8"))
-try await Task.sleep(nanoseconds: 100_000_000)
+try send(product, sink, "localStorage.write", storageWriteFrame(requestId: "5", key: "note", value: Data("a note".utf8)), expecting: 5)
+try send(product, sink, "localStorage.read", storageReadFrame(requestId: "6", key: "note"), expecting: 6)
+try send(product, sink, "notifications.pushNotification", pushNotificationFrame(requestId: "7", text: "saved"), expecting: 7)
+try send(product, sink, "account.accountsSubscribe", accountsSubscribeFrame(requestId: "8"), expecting: 8)
 print("[phone] add account bob")
 phone.addAccount(name: "bob")
-try await Task.sleep(nanoseconds: 100_000_000)
-check(productSink.items == 2, "the product received the current list, then the pushed change")
-try await send(product, "stop account.accountsSubscribe", accountsUnsubscribeFrame(requestId: "8"))
-try await Task.sleep(nanoseconds: 100_000_000)
+sink.waitForFrames(9)
+check(sink.items == 2, "the product received the current list, then the pushed change")
+// No timing: `receiveFrame` serves the stop before it returns, and the core's one
+// executor runs calls in the order they are woken, so an item for carol would
+// reach the sink before the answer to the next call.
+try send(product, sink, "stop account.accountsSubscribe", accountsUnsubscribeFrame(requestId: "8"), expecting: 9)
 print("[phone] add account carol, after the product stopped following")
 phone.addAccount(name: "carol")
-try await Task.sleep(nanoseconds: 100_000_000)
-check(productSink.items == 2, "a stopped subscription receives nothing more")
+try send(product, sink, "account.getAccounts, which sees carol", getAccountsFrame(requestId: "9"), expecting: 10)
+check(sink.items == 2, "a stopped subscription receives nothing more")
 
 print("[host] a runtime with no providers attached")
+let bareSink = PrintingSink()
 let bare = hostRuntime(
     productStorage: MemoryStorage(),
     userConfirmation: confirmation,
     wallet: nil,
     notifier: nil
-).productRuntime(product: ProductContext(productId: "swift-product"), sink: PrintingSink())
-try await send(bare, "account.getAccounts", getAccountsFrame(requestId: "1"))
-try await send(bare, "notifications.pushNotification", pushNotificationFrame(requestId: "2", text: "saved"))
+).productRuntime(product: ProductContext(productId: "swift-product"), sink: bareSink)
+try send(bare, bareSink, "account.getAccounts", getAccountsFrame(requestId: "1"), expecting: 1)
+try send(bare, bareSink, "notifications.pushNotification", pushNotificationFrame(requestId: "2", text: "saved"), expecting: 2)

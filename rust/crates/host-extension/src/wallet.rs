@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
-pub use protocol::latest::ProductAccount;
+use host_macros::{extension_error, extension_listener, extension_point, extension_type};
+pub use protocol::api::account::ProductAccount;
 use protocol::{Bytes, Bytes32, Bytes64};
-use sketch_macros::{extension_error, extension_listener, extension_point, extension_type};
 
 /// A request to sign `payload` with the account `public_key`.
 #[extension_type]

@@ -50,22 +50,12 @@ impl TypeName {
 		self.path.first().map(String::as_str).unwrap_or_default()
 	}
 
-	/// The name in Rust source.
+	/// The name in Rust source, which the TypeScript type and codec share.
 	pub fn rust_name(&self) -> &str {
 		self.path.last().map(String::as_str).unwrap_or_default()
 	}
 
-	/// The name in TypeScript. A versioned envelope shares its payload's Rust
-	/// name, so it gets a `Versioned` prefix there.
-	pub fn ts_name(&self) -> String {
-		if self.path.iter().any(|segment| segment == "versioned") {
-			format!("Versioned{}", self.rust_name())
-		} else {
-			self.rust_name().to_string()
-		}
-	}
-
-	/// The path from the crate root, `crate`-relative for a local type.
+	/// The full path, starting with the crate name.
 	pub fn rust_path(&self) -> String {
 		self.path.join("::")
 	}
@@ -96,7 +86,6 @@ impl TypeDef {
 				.iter()
 				.flat_map(|variant| match &variant.shape {
 					VariantShape::Unit => Vec::new(),
-					VariantShape::Newtype(inner) => vec![inner],
 					VariantShape::Named(fields) => {
 						fields.iter().map(|field| &field.type_ref).collect()
 					},
@@ -138,8 +127,6 @@ pub struct EnumVariant {
 pub enum VariantShape {
 	/// No payload.
 	Unit,
-	/// One unnamed field, as in a versioned envelope's `V1(payload)`.
-	Newtype(TypeRef),
 	/// Named fields.
 	Named(Vec<Field>),
 }

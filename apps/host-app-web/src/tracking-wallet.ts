@@ -2,7 +2,9 @@
 // to the provider, so it sees every call the core makes through the extension
 // point and records how each one stands. It gives the provider its own
 // accounts listener, which records each change the provider pushes and passes
-// it on to the core's. The core has no status API for this.
+// it on to the core's. The core has no status API for this. When the host
+// disconnects the product, the core drops the product's calls, and the host
+// marks the ones still pending as dropped.
 
 import type { ProductAccount } from "@sketch/protocol-client";
 import {
@@ -12,11 +14,11 @@ import {
   type Signature,
   type Wallet,
   type WalletError,
-} from "@sketch/host";
+} from "@sketch/host-extension";
 
 /** Where a request between the core and the wallet stands. */
 export type RequestStatus =
-  "pending" | "answered" | "rejected" | "failed" | "pushed";
+  "pending" | "answered" | "rejected" | "failed" | "pushed" | "dropped";
 
 /** One call the core made to the wallet, or one change the wallet pushed. */
 export interface WalletRequest {
@@ -31,6 +33,12 @@ export interface WalletRequest {
   readonly settledAt?: number;
 }
 
+/** A `Wallet` that reports what passes through it. */
+export interface TrackingWallet extends Wallet {
+  /** The host disconnected the product, so the core dropped its pending calls. */
+  callsDropped(): void;
+}
+
 /**
  * Wraps `inner` in a `Wallet` that reports every request the core sends
  * through it and every change `inner` pushes. `onChange` receives the full
@@ -39,7 +47,7 @@ export interface WalletRequest {
 export function trackRequests(
   inner: Wallet,
   onChange: (requests: readonly WalletRequest[]) => void,
-): Wallet {
+): TrackingWallet {
   let requests: WalletRequest[] = [];
   let nextId = 1;
 
@@ -51,7 +59,7 @@ export function trackRequests(
   };
   const settle = (id: number, status: RequestStatus, outcome: string) => {
     requests = requests.map((request) =>
-      request.id === id
+      request.id === id && request.status === "pending"
         ? { ...request, status, outcome, settledAt: Date.now() }
         : request,
     );
@@ -85,6 +93,13 @@ export function trackRequests(
   }
 
   return {
+    callsDropped() {
+      for (const request of requests) {
+        if (request.status === "pending") {
+          settle(request.id, "dropped", "the product disconnected");
+        }
+      }
+    },
     accounts: () =>
       track("accounts", "list accounts", () => inner.accounts(), countAccounts),
     sign: (request: SignRequest) =>

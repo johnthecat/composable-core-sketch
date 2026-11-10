@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 # wasm-opt cannot read the enabled Wasm features from a stripped binary, so they
 # are listed here.
@@ -23,15 +23,11 @@ wasm-opt = [
     "--strip-producers",
 ]
 
-[dependencies]
+# The crate builds for wasm32 only; natively it is empty.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 host-provider-notifier-log.workspace = true
 host-provider-wallet-mock.workspace = true
 host-runtime.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-uniffi.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
 
 [lints]

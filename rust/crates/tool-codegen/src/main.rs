@@ -1,6 +1,6 @@
 //! Generates the TypeScript side of the sketch from rustdoc JSON: the product
 //! client (`@sketch/protocol-client`) from the protocol crate, and the
-//! extension point interfaces (`@sketch/host`) from the interface crate.
+//! extension point interfaces (`@sketch/host-extension`) from the interface crate.
 //!
 //! The Rust side needs no generated code: `#[wire_trait]` writes the
 //! protocol's method tables and `#[extension_point]` the web glue.
@@ -15,9 +15,6 @@ mod model;
 mod protocol;
 mod rustdoc;
 mod ts;
-
-#[cfg(test)]
-mod tests;
 
 #[derive(Parser)]
 #[command(about = "Generate the product client and the extension point interfaces")]
@@ -34,9 +31,9 @@ struct Cli {
 	#[arg(long)]
 	client_output: String,
 
-	/// `src/generated` of `@sketch/host`.
+	/// `src/generated` of `@sketch/host-extension`.
 	#[arg(long)]
-	host_output: String,
+	extension_output: String,
 }
 
 fn main() -> Result<()> {
@@ -52,7 +49,7 @@ fn main() -> Result<()> {
 	let client = Path::new(&cli.client_output);
 	write(client.join("types.ts"), ts::client::types(&api_types))?;
 	write(client.join("wire-table.ts"), ts::client::wire_table(&api))?;
-	write(client.join("client.ts"), ts::client::client(&api, &api_types))?;
+	write(client.join("client.ts"), ts::client::client(&api))?;
 
 	let extensions = extension::extension_traits(&world, &extension_crate)
 		.context("reading the extension points")?;
@@ -60,10 +57,11 @@ fn main() -> Result<()> {
 		.iter()
 		.flat_map(|extension| &extension.methods)
 		.flat_map(|method| method.type_refs())
+		.chain(extension::root_types(&extension_crate)?)
 		.collect();
 	let types = world.reachable_types(&refs)?;
 	write(
-		Path::new(&cli.host_output).join("extensions.ts"),
+		Path::new(&cli.extension_output).join("extensions.ts"),
 		ts::extensions::extensions(extension_crate.name()?, &extensions, &types),
 	)?;
 	Ok(())

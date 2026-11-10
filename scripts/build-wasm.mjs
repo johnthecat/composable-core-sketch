@@ -62,6 +62,8 @@ try {
 await rm(resolve(out, ".gitignore"), { force: true });
 
 const glue = await readFile(resolve(out, `${outName}.d.ts`), "utf8");
+// Two imports would mean two crates declared `typescript_module!`, which the
+// one `HostExtension` namespace cannot serve.
 const imports = glue.match(/^import type \* as HostExtension from "[^"]+";$/gm);
 const leaked = [...glue.matchAll(/\bclass (Wasm\w+)\b/g)].map(
   ([, name]) => name,

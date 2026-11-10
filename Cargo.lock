@@ -549,8 +549,7 @@ dependencies = [
  "host-provider-notifier-log",
  "host-provider-wallet-mock",
  "host-runtime",
- "parity-scale-codec",
- "protocol",
+ "product-native",
  "uniffi",
 ]
 
@@ -561,7 +560,6 @@ dependencies = [
  "host-provider-notifier-log",
  "host-provider-wallet-mock",
  "host-runtime",
- "uniffi",
  "wasm-bindgen",
 ]
 
@@ -570,18 +568,28 @@ name = "host-extension"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "host-macros",
  "js-sys",
  "protocol",
  "send_wrapper",
  "serde",
  "serde-wasm-bindgen",
- "sketch-macros",
  "thiserror",
  "uniffi",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
+]
+
+[[package]]
+name = "host-macros"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -616,16 +624,13 @@ dependencies = [
  "async-trait",
  "futures",
  "host-extension",
- "js-sys",
+ "host-macros",
  "parity-scale-codec",
  "protocol",
- "send_wrapper",
- "sketch-macros",
  "thiserror",
  "uniffi",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
@@ -856,16 +861,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "product-native"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "protocol",
+ "uniffi",
+]
+
+[[package]]
 name = "protocol"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "futures",
+ "host-macros",
  "parity-scale-codec",
  "serde",
  "serde_bytes",
- "sketch-macros",
- "thiserror",
  "uniffi",
 ]
 
@@ -1058,16 +1071,6 @@ name = "siphasher"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
-
-[[package]]
-name = "sketch-macros"
-version = "0.1.0"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
 
 [[package]]
 name = "slab"

@@ -1,6 +1,6 @@
-//! A [`Wallet`](host_extension::Wallet) provider that simulates a wallet on a paired
+//! A [`Wallet`](host_extension::wallet::Wallet) provider that simulates a wallet on a paired
 //! phone. It holds its accounts in memory, answers each sign request after a
-//! delay, and declines it or never answers when told to.
+//! delay, and declines it, or never answers, when told to.
 //!
 //! The crate depends on the interface crate only, never on the core.
 //! `src/wallet.rs` implements the trait, and each export sits in its own file:

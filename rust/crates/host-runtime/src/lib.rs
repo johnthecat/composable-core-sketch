@@ -1,10 +1,10 @@
 //! The core: serves the product protocol to each product connection over the
 //! extension points the host supplies.
 //!
-//! A host builds one [`HostRuntime`] from its extension points, each an
-//! `Arc<dyn Trait>`: storage and user confirmation always, a wallet and a
-//! notifier when it has them. Then one [`ProductRuntime`] per product takes the
-//! product's frames and answers through a [`FrameSink`]. The core depends on
+//! A host builds one [`HostRuntime`] from its [`HostExtensions`]: storage and
+//! user confirmation always, a wallet and a notifier when it has them. Then one
+//! [`ProductRuntime`] per product takes the product's frames and answers through
+//! its `FrameSink`. The core depends on
 //! the interface crate, re-exported as [`host::extension`], and never on a
 //! provider.
 //!
@@ -26,21 +26,14 @@ pub mod host {
 	}
 }
 
+mod calls;
 mod dispatcher;
-mod frame;
-mod host_core;
 mod runtime;
-mod subscription;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
-pub use frame::{
-	MESSAGE_TYPE_INTERRUPT, MESSAGE_TYPE_REQUEST, MESSAGE_TYPE_RESPONSE, MESSAGE_TYPE_STOP,
-	Payload, ProtocolMessage,
-};
-pub use host_core::{FrameSink, HostRuntime, ProductContext, ProductRuntime, ProductRuntimeError};
-/// Export a host crate's runtime constructor; see [`sketch_macros::constructor`].
-pub use sketch_macros::constructor;
-pub use subscription::{Spawner, platform_spawner};
+/// Export a host crate's runtime constructor; see [`host_macros::constructor`].
+pub use host_macros::constructor;
+pub use runtime::{HostExtensions, HostRuntime, ProductRuntime, ProductRuntimeError};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::{WasmHostRuntime, WasmProductRuntime};

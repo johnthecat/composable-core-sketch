@@ -5,7 +5,7 @@ import type {
   ProductStorage,
   UserConfirmation,
   UserConfirmationReview,
-} from "@sketch/host";
+} from "@sketch/host-extension";
 
 /** How the page answers a confirmation. */
 export type ConfirmationMode = "ask" | "approve" | "deny";

@@ -1,10 +1,11 @@
 /target/
+.idea/
 node_modules/
 *.tsbuildinfo
 
 # Written by `make codegen`, never committed.
 js/packages/protocol-client/src/generated/
-js/packages/host/src/generated/
+js/packages/host-extension/src/generated/
 
 # Build outputs: tsc, wasm-pack and Vite.
 js/packages/*/dist/

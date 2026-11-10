@@ -1,5 +1,5 @@
-// The host's side of the iframe handshake: frame the product, and hand it a
-// `MessagePort` once it asks.
+// The host's side of the iframe handshake: frame the product, and hand it one
+// end of a `MessageChannel` once it asks.
 
 /** Options of {@link createIframeHost}. */
 export interface IframeHostOptions {
@@ -7,24 +7,23 @@ export interface IframeHostOptions {
   iframeUrl: string;
   /** Element the iframe is appended to. */
   container: HTMLElement;
-  /** The host's end of the product's channel, given before the frame loads. */
-  onPort(port: MessagePort): void;
 }
 
 /** A framed product. */
 export interface IframeHost {
   iframe: HTMLIFrameElement;
+  /** The host's end of the product's channel. */
+  port: MessagePort;
   dispose(): void;
 }
 
 /**
  * Frame a product and transfer one end of a `MessageChannel` to it when it
- * sends `truapi-ready`; the other end goes to `onPort`. Frames then travel
- * over the channel only.
+ * sends `truapi-ready`; the other end is the returned `port`. Frames then
+ * travel over the channel only.
  */
 export function createIframeHost(options: IframeHostOptions): IframeHost {
   const channel = new MessageChannel();
-  options.onPort(channel.port1);
   let productPort: MessagePort | undefined = channel.port2;
 
   const iframe = document.createElement("iframe");
@@ -47,6 +46,7 @@ export function createIframeHost(options: IframeHostOptions): IframeHost {
 
   return {
     iframe,
+    port: channel.port1,
     dispose() {
       window.removeEventListener("message", onMessage);
       channel.port1.close();

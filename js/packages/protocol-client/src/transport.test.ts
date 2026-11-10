@@ -54,19 +54,16 @@ function loopback(
 }
 
 describe("the generated client over a transport", () => {
-  test("a domain error arrives as the versioned error the method declares", async () => {
+  test("a domain error arrives as the error the method declares", async () => {
     const client = createClient(
       createTransport(
         loopback((frame, reply) => {
           const error = S.Result(
-            T.VersionedHostSignRawResponse,
-            S.CallError(T.VersionedHostSignRawError),
+            T.HostSignRawResponse,
+            S.CallError(T.HostSignRawError),
           ).enc({
             success: false,
-            value: {
-              tag: "Domain",
-              value: { tag: "V1", value: { tag: "Rejected" } },
-            },
+            value: { tag: "Domain", value: { tag: "Rejected" } },
           });
           reply({ ...frame, messageType: MESSAGE_TYPE_RESPONSE, value: error });
         }),
@@ -80,7 +77,7 @@ describe("the generated client over a transport", () => {
 
     expect(result.isErr() && result.error).toEqual({
       tag: "Domain",
-      value: { tag: "V1", value: { tag: "Rejected", value: undefined } },
+      value: { tag: "Rejected", value: undefined },
     });
   });
 
@@ -88,11 +85,8 @@ describe("the generated client over a transport", () => {
     const client = createClient(
       createTransport(
         loopback((frame, reply) => {
-          const item = T.VersionedHostAccountAccountsSubscribeItem.enc({
-            tag: "V1",
-            value: {
-              accounts: [{ publicKey: new Uint8Array(32), name: "alice" }],
-            },
+          const item = T.HostAccountAccountsSubscribeItem.enc({
+            accounts: [{ publicKey: new Uint8Array(32), name: "alice" }],
           });
           reply({ ...frame, messageType: MESSAGE_TYPE_RESPONSE, value: item });
           reply({

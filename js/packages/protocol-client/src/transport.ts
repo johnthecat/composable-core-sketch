@@ -20,12 +20,10 @@ export const MESSAGE_TYPE_RESPONSE = 1;
 export const MESSAGE_TYPE_INTERRUPT = 2;
 /** Product to host: stop a subscription. */
 export const MESSAGE_TYPE_STOP = 3;
-/** Trait id of method-independent protocol errors. */
-export const PROTOCOL_ERROR_TRAIT_ID = 255;
 
 /**
  * One wire frame: `[requestId: SCALE str][trait][method][message_type][payload]`.
- * The payload is the leg's versioned envelope, without a length prefix.
+ * The payload is the leg's SCALE-encoded value, without a length prefix.
  */
 export interface ProtocolMessage {
   requestId: string;
@@ -95,18 +93,10 @@ export function createMessagePortProvider(port: MessagePort): WireProvider {
   };
 }
 
-/** The host serves no method at the address a call used. */
-export class UnsupportedMessageError extends Error {
-  constructor(ids: MethodIds) {
-    super(`the host serves no method at (${ids.trait}, ${ids.method})`);
-    this.name = "UnsupportedMessageError";
-  }
-}
-
 /** Options of {@link TrUApiTransport.request}. */
 export interface RequestParams<Ok, Err> {
   ids: MethodIds;
-  /** The encoded request envelope. */
+  /** The encoded request. */
   payload: Uint8Array;
   /** Decode the response leg into its outcome. */
   decodeResponse(payload: Uint8Array):
@@ -120,14 +110,12 @@ export interface RequestParams<Ok, Err> {
 /** Options of {@link TrUApiTransport.subscribeRaw}. */
 export interface SubscribeRawParams {
   ids: MethodIds;
-  /** The encoded start envelope. */
+  /** The encoded start request. */
   payload: Uint8Array;
   /** Each item leg's payload. */
   onReceive(payload: Uint8Array): void;
   /** The interrupt leg's payload, which ends the subscription. */
   onInterrupt(payload: Uint8Array): void;
-  /** The subscription could not run. */
-  onClose(error: Error): void;
 }
 
 /** A running subscription. */
@@ -147,27 +135,15 @@ export interface TrUApiTransport {
 export function createTransport(provider: WireProvider): TrUApiTransport {
   let counter = 0;
   const nextId = () => `p:${++counter}`;
-  const requests = new Map<
-    string,
-    { ids: MethodIds; settle(frame: ProtocolMessage): void }
-  >();
+  const requests = new Map<string, (frame: ProtocolMessage) => void>();
   const subscriptions = new Map<string, SubscribeRawParams>();
 
   provider.subscribe((bytes) => {
     const frame = decodeWireMessage(bytes);
-    if (frame.traitId === PROTOCOL_ERROR_TRAIT_ID) {
-      const request = requests.get(frame.requestId);
-      const subscription = subscriptions.get(frame.requestId);
+    const settle = requests.get(frame.requestId);
+    if (settle && frame.messageType === MESSAGE_TYPE_RESPONSE) {
       requests.delete(frame.requestId);
-      subscriptions.delete(frame.requestId);
-      if (request) request.settle(frame);
-      subscription?.onClose(new UnsupportedMessageError(subscription.ids));
-      return;
-    }
-    const request = requests.get(frame.requestId);
-    if (request && frame.messageType === MESSAGE_TYPE_RESPONSE) {
-      requests.delete(frame.requestId);
-      request.settle(frame);
+      settle(frame);
       return;
     }
     const subscription = subscriptions.get(frame.requestId);
@@ -200,20 +176,13 @@ export function createTransport(provider: WireProvider): TrUApiTransport {
     request<Ok, Err>(params: RequestParams<Ok, Err>): ResultAsync<Ok, Err> {
       const requestId = nextId();
       const outcome = new Promise<Result<Ok, Err>>((resolve, reject) => {
-        requests.set(requestId, {
-          ids: params.ids,
-          settle(frame) {
-            if (frame.traitId === PROTOCOL_ERROR_TRAIT_ID) {
-              reject(new UnsupportedMessageError(params.ids));
-              return;
-            }
-            try {
-              const decoded = params.decodeResponse(frame.value);
-              resolve(decoded.success ? ok(decoded.value) : err(decoded.value));
-            } catch (error) {
-              reject(error);
-            }
-          },
+        requests.set(requestId, (frame) => {
+          try {
+            const decoded = params.decodeResponse(frame.value);
+            resolve(decoded.success ? ok(decoded.value) : err(decoded.value));
+          } catch (error) {
+            reject(error);
+          }
         });
       });
       send(requestId, params.ids, MESSAGE_TYPE_REQUEST, params.payload);
@@ -234,11 +203,11 @@ export function createTransport(provider: WireProvider): TrUApiTransport {
   };
 }
 
-/** Why a subscription ended early: its interrupt value, or a transport failure. */
+/** Why a subscription ended early: its interrupt value. */
 export class SubscriptionError<Reason> extends Error {
-  readonly reason: Reason | undefined;
+  readonly reason: Reason;
 
-  constructor(message: string, reason?: Reason) {
+  constructor(message: string, reason: Reason) {
     super(message);
     this.name = "SubscriptionError";
     this.reason = reason;
@@ -293,8 +262,6 @@ export function createObservable<Item, Reason>(options: {
               new SubscriptionError("subscription interrupted", reason),
             );
         },
-        onClose: (error) =>
-          observer.error?.(new SubscriptionError<Reason>(error.message)),
       });
     },
   };

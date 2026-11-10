@@ -47,7 +47,7 @@
           <legend>The phone answers sign requests with</legend>
           <label><input type="radio" name="decision" value="Approve" checked /> Approve</label>
           <label><input type="radio" name="decision" value="Decline" /> Decline</label>
-          <label><input type="radio" name="decision" value="Unreachable" /> Nothing</label>
+          <label><input type="radio" name="decision" value="Unreachable" /> Never answers</label>
         </fieldset>
         <label>
           After (ms)
@@ -69,6 +69,11 @@
 
       <section aria-labelledby="product-title" class="wide">
         <h2 id="product-title">Product, in an iframe</h2>
+        <p class="muted">
+          Reloading disconnects the product: the core drops the calls it still
+          has in flight, such as a sign the phone never answers.
+        </p>
+        <button type="button" id="reload-product" class="secondary">Reload the product</button>
         <div id="product-frame" class="product-frame"></div>
       </section>
 

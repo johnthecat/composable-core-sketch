@@ -6,7 +6,8 @@
   "type": "module",
   "dependencies": {
     "@sketch/protocol-client": "*",
-    "@sketch/host": "*"
+    "@sketch/host": "*",
+    "@sketch/host-extension": "*"
   },
   "devDependencies": {
     "vite": "^8.0.0"

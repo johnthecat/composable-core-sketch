@@ -15,8 +15,6 @@ use futures::{
 };
 use parity_scale_codec::Encode;
 
-use crate::CallContext;
-
 /// Wire pair of one protocol method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MethodIds {
@@ -37,14 +35,14 @@ pub enum SubscriptionOutput {
 /// The frames of one running subscription.
 pub type SubscriptionStream = BoxStream<'static, SubscriptionOutput>;
 
-/// Serves a request: the host, the call's context and the encoded request, to
-/// the encoded `Result<Response, CallError<Error>>`.
-pub type RequestHandler<H> = fn(Arc<H>, CallContext, Vec<u8>) -> BoxFuture<'static, Vec<u8>>;
+/// Serves a request: the host and the encoded request, to the encoded
+/// `Result<Response, CallError<Error>>`.
+pub type RequestHandler<H> = fn(Arc<H>, Vec<u8>) -> BoxFuture<'static, Vec<u8>>;
 
 /// Starts a subscription: its frames, or the encoded interrupt that ends it
 /// before it starts.
 pub type SubscriptionHandler<H> =
-	fn(Arc<H>, CallContext, Vec<u8>) -> BoxFuture<'static, Result<SubscriptionStream, Vec<u8>>>;
+	fn(Arc<H>, Vec<u8>) -> BoxFuture<'static, Result<SubscriptionStream, Vec<u8>>>;
 
 /// How a method is served.
 pub enum Handler<H> {

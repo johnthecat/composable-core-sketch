@@ -17,15 +17,12 @@ fn the_phone_answers_each_request_as_it_was_last_told() {
 	wallet.set_decision(PhoneDecision::Decline);
 	let declined = block_on(wallet.sign(sign_request(&alice)));
 	wallet.set_decision(PhoneDecision::Unreachable);
-	let unreachable = block_on(wallet.sign(sign_request(&alice)));
+	let mut unreachable = Box::pin(wallet.sign(sign_request(&alice)));
+	let unanswered = block_on(futures::future::poll_immediate(&mut unreachable)).is_none();
 
 	assert_eq!(
-		[approved.map(|_| ()), declined.map(|_| ()), unreachable.map(|_| ())],
-		[
-			Ok(()),
-			Err(WalletError::Rejected),
-			Err(WalletError::Unknown { reason: "the phone did not answer".into() })
-		],
+		(approved.map(|_| ()), declined.map(|_| ()), unanswered),
+		(Ok(()), Err(WalletError::Rejected), true),
 	);
 }
 

@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::sync::Arc;
 
-use host_extension::{JsWallet, WasmWallet};
+use host_extension::wallet::{JsWallet, WasmWallet};
 use wasm_bindgen::prelude::*;
 
 use crate::{MockWallet, PhoneDecision};

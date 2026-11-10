@@ -72,33 +72,43 @@ impl Crate {
 		self.index.get(id).with_context(|| format!("rustdoc item {id} is missing"))
 	}
 
-	/// The items the crate root exports, following `pub use` of local items and
-	/// glob re-exports of local modules.
-	pub fn root_items(&self) -> Result<Vec<&Item>> {
+	/// The items the crate exports, with their ids: those of the root and of
+	/// its public modules, following `pub use` of local items.
+	pub fn root_items(&self) -> Result<Vec<(String, &Item)>> {
 		let mut items = Vec::new();
 		self.module_items(self.item(&id_string(&self.root)?)?, &mut items)?;
 		Ok(items)
 	}
 
 	/// The items `module` exports, appended to `items`.
-	fn module_items<'a>(&'a self, module: &Item, items: &mut Vec<&'a Item>) -> Result<()> {
+	fn module_items<'a>(
+		&'a self,
+		module: &Item,
+		items: &mut Vec<(String, &'a Item)>,
+	) -> Result<()> {
 		let ids = module
 			.inner
 			.pointer("/module/items")
 			.and_then(Value::as_array)
 			.context("not a module")?;
 		for id in ids {
-			let item = self.item(&id_string(id)?)?;
+			let id = id_string(id)?;
+			let item = self.item(&id)?;
+			if item.inner.get("module").is_some() {
+				self.module_items(item, items)?;
+				continue;
+			}
 			let Some(import) = item.inner.get("use") else {
-				items.push(item);
+				items.push((id, item));
 				continue;
 			};
-			let Some(target) = import.get("id").filter(|id| !id.is_null()) else { continue };
-			let Some(target) = self.index.get(&id_string(target)?) else { continue };
 			if import.get("is_glob").and_then(Value::as_bool) == Some(true) {
-				self.module_items(target, items)?;
-			} else {
-				items.push(target);
+				bail!("glob re-exports are not supported; export each item, or a public module");
+			}
+			let Some(target_id) = import.get("id").filter(|id| !id.is_null()) else { continue };
+			let target_id = id_string(target_id)?;
+			if let Some(target) = self.index.get(&target_id) {
+				items.push((target_id, target));
 			}
 		}
 		Ok(())
@@ -131,7 +141,8 @@ impl Crate {
 			.collect()
 	}
 
-	fn local_path(&self, id: &str) -> Option<&ItemPath> {
+	/// The path of the local item `id`.
+	pub fn local_path(&self, id: &str) -> Option<&ItemPath> {
 		self.paths.get(id).filter(|path| path.crate_id == 0)
 	}
 
@@ -261,17 +272,8 @@ impl<'a> World<'a> {
 					VariantShape::Unit
 				} else if let Some(ids) = kind.pointer("/struct/fields").and_then(Value::as_array) {
 					VariantShape::Named(self.fields(krate, ids)?)
-				} else if let Some([id]) =
-					kind.get("tuple").and_then(Value::as_array).map(Vec::as_slice)
-				{
-					let field = krate.item(&id_string(id)?)?;
-					let ty =
-						field.inner.get("struct_field").context("variant field has no type")?;
-					VariantShape::Newtype(self.type_ref(krate, ty)?)
 				} else {
-					bail!(
-						"variant {name}::{variant_name} must be unit, a newtype or have named fields"
-					);
+					bail!("variant {name}::{variant_name} must be unit or have named fields");
 				};
 				variants.push(EnumVariant {
 					name: variant_name,

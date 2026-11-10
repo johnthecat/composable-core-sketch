@@ -4,7 +4,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use super::*;
-use crate::WalletError;
+use crate::wallet::WalletError;
 
 // The generated TypeScript declares every byte value a `Uint8Array`. The
 // byte types serialize themselves that way, and the attributes refuse any

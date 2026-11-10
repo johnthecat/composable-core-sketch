@@ -2,83 +2,58 @@
 //!
 //! A [`Dispatcher`] holds the protocol's method table (`protocol::api::methods`,
 //! written by `#[wire_trait]`), keyed on each method's `(trait, method)` wire
-//! pair, and the host that serves it.
+//! pair, the host that serves it, and the product's frame sink. Every call runs
+//! under [`LiveCalls`]. A frame no method serves is dropped.
 
 use std::{collections::HashMap, sync::Arc};
 
-use parity_scale_codec::Encode;
+use host_extension::product::FrameSink;
 use protocol::{
-	CallContext,
 	dispatch::{Handler, Method, MethodIds},
-	v01,
-	versioned::protocol_error::ProtocolError,
+	frame::{MESSAGE_TYPE_REQUEST, MESSAGE_TYPE_STOP, ProtocolMessage},
 };
 
-use crate::{
-	FrameSink,
-	frame::{
-		MESSAGE_TYPE_INTERRUPT, MESSAGE_TYPE_REQUEST, MESSAGE_TYPE_RESPONSE, MESSAGE_TYPE_STOP,
-		PROTOCOL_ERROR_METHOD_ID, PROTOCOL_ERROR_TRAIT_ID, ProtocolMessage,
-	},
-	subscription::{Spawner, SubscriptionManager},
-};
+use crate::calls::{LiveCalls, Spawner};
 
 /// Routes one product connection's frames to `H`.
 pub struct Dispatcher<H> {
 	methods: HashMap<(u8, u8), Handler<H>>,
 	host: Arc<H>,
-	live: SubscriptionManager,
+	calls: LiveCalls,
+	sink: Arc<dyn FrameSink>,
 }
 
 impl<H: Send + Sync + 'static> Dispatcher<H> {
-	/// Serves every method of `methods` with `host`, running subscriptions on
-	/// `spawner`.
-	pub fn new(methods: Vec<Method<H>>, host: Arc<H>, spawner: Spawner) -> Self {
+	/// Serves every method of `methods` with `host`, running calls on
+	/// `spawner` and sending what they produce to `sink`.
+	pub fn new(
+		methods: Vec<Method<H>>,
+		host: Arc<H>,
+		spawner: Spawner,
+		sink: Arc<dyn FrameSink>,
+	) -> Self {
 		let methods = methods
 			.into_iter()
 			.map(|Method { ids, handler }| ((ids.trait_id, ids.method_id), handler))
 			.collect();
-		Self { methods, host, live: SubscriptionManager::new(spawner) }
+		Self { methods, host, calls: LiveCalls::new(spawner), sink }
 	}
 
-	/// Serve one frame, sending what it produces to `sink`.
-	pub async fn dispatch(&self, message: ProtocolMessage, sink: &Arc<dyn FrameSink>) {
+	/// Start serving one frame.
+	pub fn dispatch(&self, message: ProtocolMessage) {
 		let ProtocolMessage { request_id, payload } = message;
 		let ids = MethodIds { trait_id: payload.trait_id, method_id: payload.method_id };
-		let reply = |message_type, value| {
-			ProtocolMessage::new(request_id.clone(), ids, message_type, value).encode()
-		};
-		let cx = CallContext { request_id: request_id.clone() };
 		match (self.methods.get(&(ids.trait_id, ids.method_id)), payload.message_type) {
 			(Some(Handler::Request(handler)), MESSAGE_TYPE_REQUEST) => {
-				let response = handler(self.host.clone(), cx, payload.value).await;
-				sink.emit_frame(reply(MESSAGE_TYPE_RESPONSE, response));
+				let call = handler(self.host.clone(), payload.value);
+				self.calls.request(request_id, ids, call, self.sink.clone());
 			},
 			(Some(Handler::Subscription(handler)), MESSAGE_TYPE_REQUEST) => {
-				match handler(self.host.clone(), cx, payload.value).await {
-					Ok(stream) => self.live.activate(request_id, ids, stream, sink.clone()),
-					Err(interrupt) => sink.emit_frame(reply(MESSAGE_TYPE_INTERRUPT, interrupt)),
-				}
+				let start = handler(self.host.clone(), payload.value);
+				self.calls.subscription(request_id, ids, start, self.sink.clone());
 			},
-			(Some(Handler::Subscription(_)), MESSAGE_TYPE_STOP) => self.live.stop(&request_id),
-			(Some(_), _) => {},
-			(None, _) => {
-				let error = ProtocolError::from(v01::ProtocolError::UnsupportedMessage {
-					trait_id: ids.trait_id,
-					method_id: ids.method_id,
-				});
-				let address = MethodIds {
-					trait_id: PROTOCOL_ERROR_TRAIT_ID,
-					method_id: PROTOCOL_ERROR_METHOD_ID,
-				};
-				let frame = ProtocolMessage::new(
-					request_id,
-					address,
-					MESSAGE_TYPE_RESPONSE,
-					error.encode(),
-				);
-				sink.emit_frame(frame.encode());
-			},
+			(Some(Handler::Subscription(_)), MESSAGE_TYPE_STOP) => self.calls.stop(&request_id),
+			_ => {},
 		}
 	}
 }

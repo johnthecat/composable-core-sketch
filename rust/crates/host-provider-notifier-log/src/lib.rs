@@ -1,4 +1,4 @@
-//! A [`Notifier`](host_extension::Notifier) provider that writes each notice to the
+//! A [`Notifier`](host_extension::notifier::Notifier) provider that writes each notice to the
 //! log, the provider crate of the RFC's example.
 //!
 //! The crate depends on the interface crate only. `src/notifier.rs` implements

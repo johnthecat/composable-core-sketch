@@ -4,7 +4,7 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use futures::channel::mpsc;
-use host_extension::{AccountsListener, ProductAccount};
+use host_extension::wallet::{AccountsListener, ProductAccount};
 
 /// One sender per live product subscription following a `T`.
 pub struct Bus<T> {

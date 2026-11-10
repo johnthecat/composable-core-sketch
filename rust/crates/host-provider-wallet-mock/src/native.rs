@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::sync::Arc;
 
-use host_extension::Wallet;
+use host_extension::wallet::Wallet;
 
 use crate::{MockWallet, PhoneDecision};
 

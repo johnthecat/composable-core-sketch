@@ -3,13 +3,13 @@
 // standing in for real ones, not cryptographic keys or signatures.
 
 import type { ProductAccount } from "@sketch/protocol-client";
-import type {
-  AccountsListener,
-  SignRequest,
-  Signature,
-  Wallet,
-} from "@sketch/host";
-import { WalletException } from "@sketch/host";
+import {
+  WalletException,
+  type AccountsListener,
+  type SignRequest,
+  type Signature,
+  type Wallet,
+} from "@sketch/host-extension";
 
 async function sha(algorithm: "SHA-256" | "SHA-512", ...parts: Uint8Array[]) {
   const joined = new Uint8Array(

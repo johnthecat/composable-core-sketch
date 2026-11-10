@@ -1,4 +1,4 @@
-use host_extension::{Notifier, NotifierError};
+use host_extension::notifier::{Notifier, NotifierError};
 
 /// Notifier that writes each notice as one log line.
 pub struct LogNotifier {

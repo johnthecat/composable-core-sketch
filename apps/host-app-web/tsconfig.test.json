@@ -1,0 +1,9 @@
+{
+  // Typechecks the tests too, which `tsconfig.json` leaves out. `bun test`
+  // runs them without typechecking.
+  "extends": "./tsconfig.json",
+  "exclude": [],
+  "compilerOptions": {
+    "types": ["vite/client", "bun"]
+  }
+}

@@ -24,10 +24,9 @@ const message = element<HTMLInputElement>("sign-message");
 const note = element<HTMLInputElement>("note");
 const results = element<HTMLOListElement>("results");
 
-/** Show one call's outcome; `outcome` is what the e2e check reads. */
+/** Show one call's outcome; the style colours a line by its `outcome`. */
 function report(method: string, outcome: string, detail = ""): void {
   const item = document.createElement("li");
-  item.dataset.method = method;
   item.dataset.outcome = outcome;
   item.textContent = `${method}: ${outcome}${detail === "" ? "" : ` (${detail})`}`;
   results.prepend(item);
@@ -40,7 +39,7 @@ function describeError(error: CallErrorValue<unknown>): [string, string] {
       error.value && "reason" in error.value ? error.value.reason : "";
     return [error.tag, reason];
   }
-  const payload = (error.value as { value: unknown }).value;
+  const payload = error.value;
   if (typeof payload === "object" && payload !== null && "tag" in payload) {
     const tagged = payload as { tag: string; value?: { reason?: string } };
     return [`Domain:${tagged.tag}`, tagged.value?.reason ?? ""];
@@ -105,10 +104,7 @@ function wire(client: TrUApiClient): void {
         report("accountsSubscribe", "item", `${item.accounts.length} accounts`);
       },
       error: (error) => {
-        const [tag, detail] = error.reason
-          ? describeError(error.reason)
-          : ["closed", error.message];
-        report("accountsSubscribe", tag, detail);
+        report("accountsSubscribe", ...describeError(error.reason));
       },
     });
   let following: { unsubscribe(): void } | undefined = follow();
@@ -121,7 +117,11 @@ function wire(client: TrUApiClient): void {
       following.unsubscribe();
       following = undefined;
       followButton.textContent = "Follow accounts";
-      report("accountsSubscribe", "stopped", "the product unsubscribed");
+      // The host serves frames in order, so once a later call is answered it
+      // has served the stop: no item of this subscription can follow.
+      void client.account.getAccounts().then(() => {
+        report("accountsSubscribe", "stopped", "the host served the stop");
+      });
     }
   });
 
@@ -169,6 +169,5 @@ function wire(client: TrUApiClient): void {
 
 connectIframeHost().then((client) => {
   connection.textContent = "Connected to the host.";
-  connection.dataset.connected = "true";
   wire(client);
 });

@@ -57,7 +57,9 @@ impl JsObject {
 
 	/// Calls the method `name` with the arguments `args` builds, without
 	/// waiting. A failure, to build the arguments or in the call, is reported on
-	/// the console.
+	/// the console. `args` is a closure so that the glue's `?` on each
+	/// argument's conversion has a `Result` to return from in a method that
+	/// returns nothing.
 	pub fn send(&self, name: &'static str, args: impl FnOnce() -> Result<Vec<JsValue>, String>) {
 		let outcome = args()
 			.map_err(|reason| JsValue::from_str(&reason))

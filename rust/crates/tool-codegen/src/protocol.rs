@@ -3,9 +3,9 @@
 //!
 //! A protocol trait carries `#[wire_trait(id = N)]` and each of its methods
 //! `#[wire(id = N)]`, which rustdoc keeps as `@wire_trait_id=N` and
-//! `@wire_id=N` doc tags. Each method takes `cx: &CallContext` and a versioned
-//! request envelope, and returns either `Result<Response, CallError<Error>>` or
-//! `Subscription<Item, CallError<Error>>`, with versioned envelopes throughout.
+//! `@wire_id=N` doc tags. Each method takes at most one request, and returns
+//! either `Result<Response, CallError<Error>>` or
+//! `Subscription<Item, CallError<Error>>`.
 
 use anyhow::{Context, Result, bail};
 use heck::ToLowerCamelCase;
@@ -45,9 +45,9 @@ pub struct ApiMethod {
 	pub id: u8,
 	/// Rustdoc comment.
 	pub docs: Option<String>,
-	/// The versioned request envelope.
-	pub request: TypeRef,
-	/// Request/response or subscription, with its envelopes.
+	/// The request, or `None` for a method that takes none.
+	pub request: Option<TypeRef>,
+	/// Request/response or subscription, with what each leg carries.
 	pub kind: ApiKind,
 }
 
@@ -55,27 +55,28 @@ pub struct ApiMethod {
 pub enum ApiKind {
 	/// One request, one response.
 	Request {
-		/// The versioned response envelope.
+		/// The response.
 		response: TypeRef,
-		/// The versioned envelope of the method's own error.
+		/// The method's own error.
 		error: TypeRef,
 	},
 	/// One start, then items until an interrupt.
 	Subscription {
-		/// The versioned item envelope.
+		/// Each item.
 		item: TypeRef,
-		/// The versioned envelope of the method's own error.
+		/// The method's own error.
 		error: TypeRef,
 	},
 }
 
 impl ApiMethod {
 	/// Every type the method names.
-	pub fn type_refs(&self) -> [&TypeRef; 3] {
-		match &self.kind {
-			ApiKind::Request { response, error } => [&self.request, response, error],
-			ApiKind::Subscription { item, error } => [&self.request, item, error],
-		}
+	pub fn type_refs(&self) -> Vec<&TypeRef> {
+		let (value, error) = match &self.kind {
+			ApiKind::Request { response, error } => (response, error),
+			ApiKind::Subscription { item, error } => (item, error),
+		};
+		self.request.iter().chain([value, error]).collect()
 	}
 }
 
@@ -121,8 +122,9 @@ fn api_method(
 	let id = tag_value(docs, "wire_id").context("method has no #[wire(id = N)]")?;
 	let sig = inner.pointer("/function/sig").context("not a function")?;
 	let request = match params(sig)?.as_slice() {
-		[("cx", _), (_, request)] => world.type_ref(krate, request)?,
-		_ => bail!("a protocol method takes `cx: &CallContext` and one request"),
+		[] => None,
+		[(_, request)] => Some(world.type_ref(krate, request)?),
+		_ => bail!("a protocol method takes at most one request"),
 	};
 	let output = sig
 		.get("output")

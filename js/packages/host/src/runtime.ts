@@ -1,31 +1,24 @@
-// Connecting a framed product to a host runtime. `Product` and `FrameSink`
-// are what a host's WASM binary takes: its `.d.ts` names them from here. The
-// runtime itself comes from that binary; `HostRuntime` and `ProductRuntime`
-// are the part of its classes this module calls.
+// Connecting a framed product to a host runtime. The runtime comes from the
+// host's own WASM binary; `HostRuntime` and `ProductRuntime` are the part of
+// its classes this module calls, over the interface crate's `ProductContext`
+// and `FrameSink`.
 
-/** The product a runtime serves. */
-export interface Product {
-  productId: string;
-}
-
-/** Where a product runtime sends the frames it produces, as natively. */
-export interface FrameSink {
-  /** One encoded frame for the product. */
-  emitFrame(frame: Uint8Array): void;
-}
+import type { FrameSink, ProductContext } from "@sketch/host-extension";
 
 /** One product's connection to the core. */
 export interface ProductRuntime {
-  /** Serve one frame from the product. */
-  receiveFrame(frame: Uint8Array): Promise<void>;
-  /** Release the WASM object, which ends the connection. */
+  /** Start serving one frame from the product; throws on a malformed one. */
+  receiveFrame(frame: Uint8Array): void;
+  /** Release the WASM object, which ends the connection and drops its calls. */
   free(): void;
 }
 
 /** The runtime a host builds once and shares across products. */
 export interface HostRuntime {
   /** A runtime serving `product`, which sends its frames to `sink`. */
-  productRuntime(product: Product, sink: FrameSink): ProductRuntime;
+  productRuntime(product: ProductContext, sink: FrameSink): ProductRuntime;
+  /** Release the WASM object. */
+  free(): void;
 }
 
 /**
@@ -35,17 +28,18 @@ export interface HostRuntime {
  */
 export function connectProductPort(
   runtime: HostRuntime,
-  product: Product,
+  product: ProductContext,
   port: MessagePort,
 ): () => void {
   const productRuntime = runtime.productRuntime(product, {
     emitFrame: (frame) => port.postMessage(frame),
   });
   port.onmessage = (event: MessageEvent) => {
-    if (event.data instanceof Uint8Array) {
-      productRuntime.receiveFrame(event.data).catch((error: unknown) => {
-        console.error("the core refused a product frame", error);
-      });
+    if (!(event.data instanceof Uint8Array)) return;
+    try {
+      productRuntime.receiveFrame(event.data);
+    } catch (error) {
+      console.error("the core refused a product frame", error);
     }
   };
   port.start();

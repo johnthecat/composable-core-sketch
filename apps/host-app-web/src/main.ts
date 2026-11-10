@@ -6,11 +6,14 @@ import "./style.css";
 import {
   connectProductPort,
   createIframeHost,
+  type HostRuntime,
   type IframeHost,
-  type Notifier,
-  type UserConfirmationReview,
-  type Wallet,
 } from "@sketch/host";
+import type {
+  Notifier,
+  UserConfirmationReview,
+  Wallet,
+} from "@sketch/host-extension";
 
 import init, {
   hostRuntime,
@@ -26,6 +29,7 @@ import {
 import {
   shortHex,
   trackRequests,
+  type TrackingWallet,
   type WalletRequest,
 } from "./tracking-wallet.js";
 import { TypeScriptWallet } from "./ts-wallet.js";
@@ -79,13 +83,16 @@ async function main(): Promise<void> {
   // Each composition gets its own tracking wallet. One from a dropped runtime
   // may still settle a call; only the current one draws.
   let composition = 0;
+  let tracking: TrackingWallet | undefined;
   const wallet = (choice: WalletChoice): Wallet | undefined => {
     const current = composition;
+    tracking = undefined;
     switch (choice) {
       case "tracked":
-        return trackRequests(phone.wallet(), (requests) => {
+        tracking = trackRequests(phone.wallet(), (requests) => {
           if (current === composition) renderRequests(requests);
         });
+        return tracking;
       case "provider":
         return phone.wallet();
       case "typescript":
@@ -107,35 +114,49 @@ async function main(): Promise<void> {
     };
   };
 
+  // Framing the product connects it to the runtime; disconnecting frees its
+  // product runtime, which drops the calls it still has in flight.
+  let runtime: HostRuntime | undefined;
   let framed: { host: IframeHost; disconnect: () => void } | undefined;
-  const compose = () => {
-    composition += 1;
+  const frameProduct = (current: HostRuntime) => {
+    const host = createIframeHost({
+      iframeUrl: productUrl,
+      container: productFrame,
+    });
+    const disconnect = connectProductPort(
+      current,
+      { productId: "sketch-product" },
+      host.port,
+    );
+    framed = { host, disconnect };
+  };
+  const disconnectProduct = () => {
     framed?.disconnect();
     framed?.host.dispose();
+    framed = undefined;
+    tracking?.callsDropped();
+  };
+  const compose = () => {
+    disconnectProduct();
+    runtime?.free();
+    composition += 1;
     renderRequests([]);
     notice.textContent = "";
-    const runtime = hostRuntime(
+    const current = hostRuntime(
       storage,
       confirmation,
       wallet(checked<WalletChoice>("wallet")),
       notifier(checked<NotifierChoice>("notifier")),
     );
-    let disconnect = () => {};
-    const host = createIframeHost({
-      iframeUrl: productUrl,
-      container: productFrame,
-      onPort: (port) => {
-        disconnect = connectProductPort(
-          runtime,
-          { productId: "sketch-product" },
-          port,
-        );
-      },
-    });
-    framed = { host, disconnect };
+    runtime = current;
+    frameProduct(current);
     bootStatus.textContent = `Composed: wallet ${checked("wallet")}, notifier ${checked("notifier")}.`;
-    bootStatus.dataset.composition = `${checked("wallet")}/${checked("notifier")}`;
   };
+  element("reload-product").addEventListener("click", () => {
+    if (runtime === undefined) return;
+    disconnectProduct();
+    frameProduct(runtime);
+  });
 
   for (const input of document.querySelectorAll<HTMLInputElement>(
     'input[name="wallet"], input[name="notifier"]',
